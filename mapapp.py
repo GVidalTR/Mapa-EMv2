@@ -12,36 +12,57 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ESTILO CSS PARA PANTALLA FIJA (NO SCROLL) ---
+# --- ESTILO CSS AVANZADO (Etiquetas, Exportación y Anti-solapamiento) ---
 st.markdown("""
     <style>
-    /* Eliminar scroll del cuerpo y ajustar contenedores */
     html, body, [data-testid="stAppViewContainer"] {
         overflow: hidden;
         height: 100vh;
     }
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 0rem;
-        height: 100vh;
+    .block-container { padding-top: 1rem; }
+    
+    /* Estilo de las Etiquetas de Datos */
+    .promo-label {
+        background: white;
+        border: 1px solid #2563eb;
+        border-radius: 5px;
+        padding: 5px 8px;
+        font-size: 11px;
+        font-weight: bold;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        white-space: nowrap;
+        color: #1e293b;
+        position: relative;
     }
-    /* Estética de indicadores y gráficos */
-    .stMetric {
-        background: #ffffff;
+
+    /* Conector de flecha */
+    .promo-label::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #2563eb transparent transparent transparent;
+    }
+
+    /* Ocultar botones para exportación mediante clase print */
+    @media print {
+        .leaflet-control-zoom, .leaflet-control-layers, .leaflet-control-fullscreen {
+            display: none !important;
+        }
+    }
+
+    div[data-testid="stMetric"] {
+        background-color: rgba(125, 125, 125, 0.1);
+        border: 1px solid rgba(125, 125, 125, 0.2);
         padding: 10px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border: 1px solid #f0f2f6;
+        border-radius: 12px;
     }
-    [data-testid="stVerticalBlock"] > div {
-        direction: ltr;
-    }
-    /* Redondear el mapa */
-    iframe { border-radius: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE APOYO ---
+# --- FUNCIONES ---
 @st.cache_data
 def load_data(file):
     try:
@@ -49,111 +70,118 @@ def load_data(file):
         df = pd.read_excel(xls, sheet_name='EEMM' if 'EEMM' in xls.sheet_names else 0)
         df.columns = [str(c).strip() for c in df.columns]
         
-        col_coord = next((c for c in df.columns if 'COORD' in c.upper()), None)
-        col_ref = next((c for c in df.columns if 'REF' in c.upper()), None)
-        col_planta = next((c for c in df.columns if 'PLANTA' in c.upper()), None)
-        col_ciudad = next((c for c in df.columns if 'CIUDAD' in c.upper() or 'MUNICIPIO' in c.upper()), None)
-        col_pvp = next((c for c in df.columns if 'PVP' in c.upper()), None)
+        cols = {
+            'coord': next((c for c in df.columns if 'COORD' in c.upper()), None),
+            'ref': next((c for c in df.columns if 'REF' in c.upper()), None),
+            'planta': next((c for c in df.columns if 'PLANTA' in c.upper()), None),
+            'ciudad': next((c for c in df.columns if 'CIUDAD' in c.upper() or 'MUNICIPIO' in c.upper()), None),
+            'tier': next((c for c in df.columns if 'TIER' in c.upper()), None),
+            'tipo': next((c for c in df.columns if 'TIPOLOGIA' in c.upper()), None),
+            'dorm': next((c for c in df.columns if 'DORM' in c.upper()), None),
+            'pvp': next((c for c in df.columns if 'PVP' in c.upper()), None)
+        }
         
-        if col_coord:
-            df[['lat', 'lon']] = df[col_coord].astype(str).str.split(',', expand=True)
+        if cols['coord']:
+            df[['lat', 'lon']] = df[cols['coord']].astype(str).str.split(',', expand=True)
             df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
             df['lon'] = pd.to_numeric(df['lon'], errors='coerce')
-            if col_pvp:
-                df[col_pvp] = pd.to_numeric(df[col_pvp], errors='coerce')
             df = df.dropna(subset=['lat', 'lon'])
-            
-        return df, col_ref, col_planta, col_ciudad, col_pvp
-    except Exception as e:
-        return None, None, None, None, None
+        return df, cols
+    except:
+        return None, None
 
-# --- ESTRUCTURA PRINCIPAL ---
+# --- ESTRUCTURA ---
 st.title("Mapa de Promociones")
 
-# Definición de columnas: 75% Mapa, 25% Estadísticas
 col_mapa, col_stats = st.columns([3, 1])
 
-# Inicialización
-df_filtered = pd.DataFrame()
-map_center = [41.6, 2.2]
-zoom_level = 8
-
 with st.sidebar:
-    st.subheader("📁 Carga")
-    uploaded_file = st.file_uploader("Excel .xlsx", type=['xlsx'])
-    if st.button("🔄 Resetear"):
-        st.rerun()
+    st.header("📂 Gestión")
+    uploaded_file = st.file_uploader("Subir Excel", type=['xlsx'])
+    
+    # Interruptor de Etiquetas
+    show_labels = st.toggle("Mostrar Etiquetas de Datos", value=True)
+    
+    # Botón de Exportar (Simulado mediante Print del navegador)
+    if st.button("🖼️ Preparar Mapa para Exportar"):
+        st.warning("Usa 'Ctrl+P' o 'Imprimir' en tu navegador. Los controles del mapa se ocultarán automáticamente.")
+
+    if st.button("🔄 Resetear"): st.rerun()
     st.divider()
 
 if uploaded_file:
-    df_raw, col_ref, col_planta, col_ciudad, col_pvp = load_data(uploaded_file)
+    df_raw, cols = load_data(uploaded_file)
     
-    if df_raw is not None and not df_raw.empty:
+    if df_raw is not None:
         with st.sidebar:
-            st.subheader("🔍 Filtros")
-            ciudades = sorted(df_raw[col_ciudad].unique().astype(str)) if col_ciudad else []
-            sel_ciudades = st.multiselect("Municipios", ciudades, default=ciudades)
+            st.header("🔍 Filtros")
+            with st.expander("📍 Ciudad / Zona"):
+                c_opts = sorted(df_raw[cols['ciudad']].unique().astype(str)) if cols['ciudad'] else []
+                sel_c = st.multiselect("Municipios", c_opts, default=c_opts)
             
-            plantas = sorted(df_raw[col_planta].unique().astype(str)) if col_planta else []
-            sel_plantas = st.multiselect("Plantas", plantas, default=plantas)
-            
+            with st.expander("🏢 Planta"):
+                p_opts = sorted(df_raw[cols['planta']].unique().astype(str)) if cols['planta'] else []
+                sel_p = st.multiselect("Plantas", p_opts, default=p_opts)
+
+            # Filtrado
             df_filtered = df_raw.copy()
-            if col_ciudad: df_filtered = df_filtered[df_filtered[col_ciudad].astype(str).isin(sel_ciudades)]
-            if col_planta: df_filtered = df_filtered[df_filtered[col_planta].astype(str).isin(sel_plantas)]
+            if cols['ciudad']: df_filtered = df_filtered[df_filtered[cols['ciudad']].astype(str).isin(sel_c)]
+            if cols['planta']: df_filtered = df_filtered[df_filtered[cols['planta']].astype(str).isin(sel_p)]
 
-        if not df_filtered.empty:
-            map_center = [df_filtered['lat'].mean(), df_filtered['lon'].mean()]
-            zoom_level = 11
+        with col_stats:
+            st.subheader("📊 Estadísticas")
+            if not df_filtered.empty:
+                st.metric("Promociones", len(df_filtered[cols['ref']].unique()))
+                st.metric("Unidades", len(df_filtered))
+                if cols['pvp']:
+                    st.metric("PVP Medio", f"€{df_filtered[cols['pvp']].mean():,.0f}")
+            else:
+                st.info("Sin datos")
 
-# --- COLUMNA DERECHA: ESTADÍSTICAS (25%) ---
-with col_stats:
-    st.subheader("📊 Indicadores")
-    if not df_filtered.empty:
-        total_promos = len(df_filtered[col_ref].unique()) if col_ref else 0
-        st.metric("Promociones", total_promos)
-        st.metric("Total Unidades", len(df_filtered))
-        
-        if col_pvp and not df_filtered[col_pvp].isna().all():
-            pvp_med = df_filtered[col_pvp].mean()
-            st.metric("PVP Medio", f"€{pvp_med:,.0f}")
-        
-        # Gráfico pequeño interactivo
-        if col_planta:
-            fig = px.pie(df_filtered, names=col_planta, hole=0.4, title="Distribución Plantas")
-            fig.update_layout(showlegend=False, margin=dict(t=30, b=0, l=0, r=0), height=250)
-            st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.write("Sube datos para ver estadísticas")
+        with col_mapa:
+            if not df_filtered.empty:
+                center = [df_filtered['lat'].mean(), df_filtered['lon'].mean()]
+                m = folium.Map(location=center, zoom_start=12, tiles=None, control_scale=True)
+                sw = df_filtered[['lat', 'lon']].min().values.tolist()
+                ne = df_filtered[['lat', 'lon']].max().values.tolist()
+                m.fit_bounds([sw, ne])
+            else:
+                m = folium.Map(location=[41.6, 2.2], zoom_start=8, tiles=None)
 
-# --- COLUMNA IZQUIERDA: MAPA (75%) ---
-with col_mapa:
-    m = folium.Map(location=map_center, zoom_start=zoom_level, tiles=None)
-    
-    # Capas
-    folium.TileLayer('OpenStreetMap', name='Callejero').add_to(m)
-    folium.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri', name='Satélite'
-    ).add_to(m)
-    folium.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri', name='Límites y Calles', overlay=True
-    ).add_to(m)
+            # Capas
+            folium.TileLayer('OpenStreetMap', name='Callejero').add_to(m)
+            folium.TileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 
+                             attr='Esri', name='Satélite').add_to(m)
 
-    if not df_filtered.empty:
-        for i, (name, group) in enumerate(df_filtered.groupby(col_ref), 1):
-            row = group.iloc[0]
-            folium.Marker(
-                location=[row['lat'], row['lon']],
-                icon=folium.DivIcon(html=f"""
-                    <div style="background:#2563eb;color:white;border-radius:50%;width:26px;height:26px;
-                    display:flex;justify-content:center;align-items:center;font-weight:bold;border:2px solid white;
-                    box-shadow:0 2px 4px rgba(0,0,0,0.3);font-size:11px;">{i}</div>"""),
-                popup=folium.Popup(f"<b>Ref: {name}</b><br>Unidades: {len(group)}", max_width=200)
-            ).add_to(m)
+            # Marcadores y Etiquetas
+            if not df_filtered.empty:
+                for i, (name, group) in enumerate(df_filtered.groupby(cols['ref']), 1):
+                    row = group.iloc[0]
+                    
+                    # Marcador numérico
+                    folium.Marker(
+                        location=[row['lat'], row['lon']],
+                        icon=folium.DivIcon(html=f"""
+                            <div style="background:#2563eb;color:white;border-radius:50%;width:24px;height:24px;
+                            display:flex;justify-content:center;align-items:center;font-weight:bold;border:2px solid white;
+                            box-shadow:0 2px 4px rgba(0,0,0,0.3);font-size:10px;">{i}</div>""")
+                    ).add_to(m)
 
-    Fullscreen().add_to(m)
-    folium.LayerControl(position='topright').add_to(m)
-    
-    # Renderizar mapa con altura fija para evitar scroll
-    st_folium(m, width="100%", height=750, returned_objects=[])
+                    # Etiqueta de Datos (Permanent Tooltip)
+                    if show_labels:
+                        label_content = f"""
+                        <div class="promo-label">
+                            <span style="color:#2563eb">#{i}</span> | {name}<br>
+                            {len(group)} uds.
+                        </div>
+                        """
+                        folium.Marker(
+                            location=[row['lat'], row['lon']],
+                            icon=folium.DivIcon(html=label_content, icon_anchor=(15, 35))
+                        ).add_to(m)
+
+            Fullscreen().add_to(m)
+            # Solo añadir LayerControl si NO estamos en modo exportación
+            folium.LayerControl(position='topright').add_to(m)
+            
+            st_folium(m, width="100%", height=750, key="mapa_v12")
