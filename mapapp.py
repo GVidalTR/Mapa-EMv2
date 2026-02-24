@@ -2,6 +2,11 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
+import io
+import zipfile
+import matplotlib
+matplotlib.use('Agg') # Evita que matplotlib intente abrir ventanas visuales
+import matplotlib.pyplot as plt
 
 # --- CONFIGURACION DE PAGINA Y MEMORIA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
@@ -29,56 +34,51 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 16px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas Ultra Compactas */
+/* Tarjetas (Sin margen inferior para que el Python controle el espaciado) */
 .promo-card {
-    background-color: #252525; border: 1px solid #3a3a3a; border-radius: 4px;
-    padding: 6px 8px; margin-bottom: 4px; transition: all 0.2s;
-    display: flex; flex-direction: column; justify-content: center; position: relative;
+    background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
+    padding: 8px 10px; margin-bottom: 0px !important; transition: all 0.2s;
+    min-height: 70px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
-.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; padding-right: 15px;}
+.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 15px;}
 .promo-pill-ui {
-    background-color: #3a86ff; color: white; border-radius: 8px;
-    min-width: 24px; height: 16px; display: flex; justify-content: center;
-    align-items: center; font-size: 9px; font-weight: bold; flex-shrink: 0; padding: 0 4px;
+    background-color: #3a86ff; color: white; border-radius: 10px;
+    min-width: 26px; height: 18px; display: flex; justify-content: center;
+    align-items: center; font-size: 10px; font-weight: bold; flex-shrink: 0; padding: 0 5px;
 }
 .promo-name { 
-    font-weight: 700 !important; color: #ffffff !important; font-size: 10px !important; margin: 0 !important; 
+    font-weight: 700 !important; color: #ffffff !important; font-size: 11px !important; margin: 0 !important; 
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
 }
-.promo-details { font-size: 9px !important; color: #b0b0b0 !important; line-height: 1.2 !important; }
+.promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.3 !important; }
 .promo-details b { color: #ffffff !important; }
 
-/* Filtros y Selectores Minimizados */
-div[data-baseweb="select"] > div { background-color: #252525 !important; border-color: #3a3a3a !important; min-height: 20px !important; padding: 0px 4px !important; font-size: 10px !important;}
-span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 8px !important; padding: 1px 3px !important; height: 16px !important; margin: 1px !important;}
-.stMultiSelect label { font-size: 9px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 0px !important;}
+/* Filtros y Selectores Reducidos al Minimo */
+div[data-baseweb="select"] > div { 
+    background-color: #252525 !important; border-color: #3a3a3a !important; 
+    min-height: 22px !important; height: 24px !important; padding: 0px 4px !important; 
+}
+div[data-baseweb="select"] span { font-size: 10px !important; }
+span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 9px !important; padding: 2px 4px !important; height: 16px !important; margin: 1px !important;}
+.stMultiSelect label { font-size: 10px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 0px !important;}
 
-/* Botones Nativos Adaptables */
+/* Botones Nativos */
 div.stButton > button {
-    padding: 2px 4px !important; font-size: 9px !important; min-height: 22px !important;
+    padding: 2px 4px !important; font-size: 10px !important; min-height: 24px !important;
     background-color: transparent; border: 1px solid #3a3a3a; color: #a0a0a0; border-radius: 4px; display: flex; margin: auto;
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 
 /* Boton X de la Tarjeta */
 .btn-micro > div > button { height: 16px !important; width: 16px !important; font-size: 8px !important; border: none !important;}
-
-/* Fichas Exportacion (Modo Claro) */
-.light-card {
-    background-color: #ffffff; border: 1px solid #d1d1d1; border-left: 4px solid #3a86ff;
-    border-radius: 4px; padding: 10px; margin-bottom: 8px; color: #121212 !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05); font-family: Arial, sans-serif;
-}
-.light-card p, .light-card span, .light-card b { color: #121212 !important; font-size: 11px !important; }
-.light-title { color: #003366 !important; font-weight: 900 !important; font-size: 13px !important; margin-bottom: 4px !important; display: block;}
 </style>
 """, unsafe_allow_html=True)
 
 # --- HEADER VISUAL ---
 st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:10px; color:#b0b0b0; margin:0;">Analisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
 
-# --- LOGICA DE DATOS ---
+# --- LOGICA DE DATOS Y EXPORTACION ---
 @st.cache_data
 def load_data(file):
     try:
@@ -94,7 +94,6 @@ def load_data(file):
             'tier': 'TIER', 'zona': 'ZONA', 'ciudad': next((x for x in df.columns if 'CIUDAD' in x), None),
             'planta': 'PLANTA', 'dorm': 'Nº DORM'
         }
-        
         if not c['ref']: c['ref'] = c['nombre']
         if not c['nombre']: c['nombre'] = c['ref']
 
@@ -117,11 +116,62 @@ def clean_dorm(x):
             items.add(s)
     return "-".join(sorted(list(items)))
 
+# Generador de Imagenes ZIP (Dibuja fichas blancas para PPT)
+def generate_zip_images(df, cols):
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for idx, row in df.iterrows():
+            ref = str(row[cols['ref']])
+            nombre = str(row.get(cols['nombre'], ref))
+            if nombre.lower() in ['nan', 'none', '']: nombre = ref
+            
+            uds = row['UDS']
+            pvp = row.get(cols['pvp'], 0)
+            vrm = row.get(cols['vrm'], 0)
+            tipos = row.get(cols['dorm'], 'N/A')
+            
+            # Dibujar la tarjeta con matplotlib
+            fig, ax = plt.subplots(figsize=(6, 2.2), dpi=200)
+            ax.axis('off')
+            
+            # Fondo blanco y borde azul
+            ax.add_patch(plt.Rectangle((0, 0), 1, 1, facecolor='#ffffff', edgecolor='#d1d1d1', linewidth=2, transform=ax.transAxes))
+            ax.add_patch(plt.Rectangle((0, 0), 0.03, 1, facecolor='#3a86ff', transform=ax.transAxes))
+            
+            # Textos (Conceptos grandes, valores normales)
+            ax.text(0.06, 0.72, f"{ref} - {nombre}", fontsize=14, fontweight='heavy', color='#003366', transform=ax.transAxes)
+            
+            # Fila 1
+            ax.text(0.06, 0.40, "Unidades:", fontsize=12, fontweight='bold', color='#555555', transform=ax.transAxes)
+            ax.text(0.26, 0.40, f"{uds}", fontsize=11, color='#121212', transform=ax.transAxes)
+            
+            ax.text(0.46, 0.40, "PVP Medio:", fontsize=12, fontweight='bold', color='#555555', transform=ax.transAxes)
+            ax.text(0.68, 0.40, f"{pvp:,.0f} €", fontsize=11, color='#121212', transform=ax.transAxes)
+            
+            # Fila 2
+            ax.text(0.06, 0.15, "Unitario:", fontsize=12, fontweight='bold', color='#555555', transform=ax.transAxes)
+            ax.text(0.24, 0.15, f"{vrm:,.0f} €/m²", fontsize=11, color='#121212', transform=ax.transAxes)
+            
+            ax.text(0.46, 0.15, "Tipologias:", fontsize=12, fontweight='bold', color='#555555', transform=ax.transAxes)
+            ax.text(0.69, 0.15, f"{tipos}", fontsize=11, color='#121212', transform=ax.transAxes)
+            
+            img_buf = io.BytesIO()
+            plt.savefig(img_buf, format='png', bbox_inches='tight', pad_inches=0.05)
+            plt.close(fig)
+            img_buf.seek(0)
+            
+            # Guardar en el zip
+            zip_file.writestr(f"Ficha_{ref}.png", img_buf.read())
+            
+    zip_buffer.seek(0)
+    return zip_buffer
+
 # --- LAYOUT DE COLUMNAS ---
 col_izq, col_mapa, col_der, col_ctrl = st.columns([1, 4, 1, 0.9])
 
 df_final = pd.DataFrame()
 ALTURA_CONTENEDOR = 820 
+ALTURA_TARJETA = 80 # Altura estimada en pixeles para calcular el algoritmo de espaciado
 
 # --- PANEL DERECHO (CONTROL Y FILTROS) ---
 with col_ctrl:
@@ -131,8 +181,7 @@ with col_ctrl:
         if file:
             mostrar_etiquetas = st.toggle("Ver Precios", value=True)
             
-            # Controles de Mapa muy compactos
-            st.markdown("<p style='font-size:9px; font-weight:bold; margin-bottom:2px; color:#a0a0a0;'>MAPA</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:9px; font-weight:bold; margin-bottom:0px; color:#a0a0a0;'>ESTILO MAPA</p>", unsafe_allow_html=True)
             c_map1, c_map2 = st.columns(2)
             with c_map1:
                 tipo_vista = st.selectbox("Vista", ["Callejero", "Satelite"], label_visibility="collapsed")
@@ -141,7 +190,6 @@ with col_ctrl:
             
             st.markdown("---")
             
-            # BOTONES DE ACCION
             c_btn1, c_btn2 = st.columns(2)
             with c_btn1:
                 if st.button("Reset Filtros", use_container_width=True):
@@ -154,7 +202,7 @@ with col_ctrl:
             
             if st.button("Filtrar vista", use_container_width=True):
                 st.session_state.do_filter_view = True
-                    
+
             st.markdown("---")
 
             df_raw, cols = load_data(file)
@@ -196,7 +244,6 @@ with col_ctrl:
                     counts = df_filtered.groupby(cols['ref']).size().reset_index(name='UDS')
                     df_promo = pd.merge(df_promo, counts, on=cols['ref'])
 
-                    # LOGICA Bounding Box
                     if st.session_state.do_filter_view:
                         st.session_state.do_filter_view = False
                         map_data = st.session_state.get("main_map")
@@ -211,11 +258,22 @@ with col_ctrl:
                                 ref = str(row[cols['ref']])
                                 if not (sw_lat <= lat <= ne_lat and sw_lon <= lon <= ne_lon):
                                     st.session_state.hidden_promos.add(ref)
-                            
                             st.rerun()
                     
                     df_visible = df_promo[~df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
                     df_ocultos = df_promo[df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
+
+                    st.markdown("---")
+                    
+                    # Botón Descargar Fichas ZIP
+                    zip_data = generate_zip_images(df_visible, cols)
+                    st.download_button(
+                        label="Descargar Fichas PNG (.zip)",
+                        data=zip_data,
+                        file_name="fichas_comparables.zip",
+                        mime="application/zip",
+                        use_container_width=True
+                    )
 
                     st.markdown("---")
                     with st.expander(f"Ocultos ({len(df_ocultos)})"):
@@ -225,6 +283,9 @@ with col_ctrl:
                                 st.rerun()
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
+                                nombre_oculto = str(row.get(cols['nombre'], ref_oculta))
+                                if nombre_oculto.lower() in ['nan', 'none', '']: nombre_oculto = ref_oculta
+
                                 cx_card, cx_btn = st.columns([0.85, 0.15], vertical_alignment="center")
                                 with cx_card:
                                     st.markdown(f"<div style='background:#1e1e1e; padding:4px; border-radius:4px; margin-bottom:4px;'><span style='font-size:9px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span></div>", unsafe_allow_html=True)
@@ -232,24 +293,6 @@ with col_ctrl:
                                     if st.button("V", key=f"res_{ref_oculta}"):
                                         st.session_state.hidden_promos.remove(ref_oculta)
                                         st.rerun()
-
-                    # BLOQUE DE EXPORTACION PPT
-                    st.markdown("---")
-                    with st.expander("Fichas para PPT (Modo Claro)"):
-                        st.markdown("<p style='font-size:10px;'>Utiliza recortes (Win+Shift+S) para copiar estas fichas a tu presentacion.</p>", unsafe_allow_html=True)
-                        for _, row in df_visible.iterrows():
-                            r_ref = str(row[cols['ref']])
-                            r_nom = str(row.get(cols['nombre'], r_ref))
-                            if r_nom.lower() in ['nan', 'none', '']: r_nom = r_ref
-                            r_tip = row.get(cols['dorm'], 'N/A')
-                            
-                            st.markdown(f"""
-                            <div class="light-card">
-                                <span class="light-title">{r_ref} - {r_nom}</span>
-                                <b>Unidades:</b> {row['UDS']} &nbsp;|&nbsp; <b>Unitario:</b> {row.get(cols['vrm'], 0):,.0f} €/m²<br>
-                                <b>PVP Medio:</b> {row.get(cols['pvp'], 0):,.0f}€ &nbsp;|&nbsp; <b>Tipologias:</b> {r_tip}
-                            </div>
-                            """, unsafe_allow_html=True)
 
 # --- VISTA CENTRAL Y LATERALES ---
 if file and not df_filtered.empty:
@@ -293,27 +336,41 @@ if file and not df_filtered.empty:
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
-    # REPARTO INTELIGENTE: Si hay pocas, van a la izquierda
+    # REPARTO Y ESPACIADO DINAMICO INTELIGENTE
     TOTAL_CARDS = len(df_visible)
-    MAX_LEFT_CAPACITY = 12 
+    MAX_LEFT_CAPACITY = 11
+    
+    # Subdividir los datos
+    if TOTAL_CARDS <= MAX_LEFT_CAPACITY:
+        left_df, right_df = df_visible, pd.DataFrame()
+    else:
+        mid = TOTAL_CARDS // 2 + (TOTAL_CARDS % 2)
+        left_df, right_df = df_visible.iloc[:mid], df_visible.iloc[mid:]
+
+    def render_column_with_spacing(df_subset, side):
+        num_cards = len(df_subset)
+        if num_cards == 0: return
+        
+        # Algoritmo de calculo de espacio vacio (Se reparte el hueco sobrante)
+        espacio_vacio = ALTURA_CONTENEDOR - (num_cards * ALTURA_TARJETA)
+        gap = max(4, espacio_vacio // (num_cards + 1)) # Minimo 4px de hueco
+        
+        st.markdown(f"<div style='height:{gap}px;'></div>", unsafe_allow_html=True)
+        for _, row in df_subset.iterrows():
+            render_promo_card(row, side)
+            st.markdown(f"<div style='height:{gap}px;'></div>", unsafe_allow_html=True)
 
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            if TOTAL_CARDS <= MAX_LEFT_CAPACITY:
-                for _, row in df_visible.iterrows(): render_promo_card(row, side="left")
-            else:
-                mid = TOTAL_CARDS // 2 + (TOTAL_CARDS % 2) 
-                for _, row in df_visible.iloc[:mid].iterrows(): render_promo_card(row, side="left")
+            render_column_with_spacing(left_df, "left")
 
     with col_der:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            if TOTAL_CARDS > MAX_LEFT_CAPACITY:
-                mid = TOTAL_CARDS // 2 + (TOTAL_CARDS % 2)
-                for _, row in df_visible.iloc[mid:].iterrows(): render_promo_card(row, side="right")
+            render_column_with_spacing(right_df, "right")
 
-    # MAPA CON CARTODB y ESRI (Sin negocios garantizado)
+    # MAPA
     with col_mapa:
-        # zoom_control=True habilita de nuevo el +/- en el mapa
+        # zoom_control=True de vuelta
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
         if tipo_vista == "Callejero":
@@ -321,18 +378,16 @@ if file and not df_filtered.empty:
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
             elif estilo_mapa == "Escala de Grises":
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-            else: # Azul Oscuro
+            else: 
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
             
             folium.TileLayer(tiles=tiles_url, attr='CartoDB', name='Callejero', overlay=False).add_to(m)
             
         else: # Satelite
-            # Capa base de foto Satelite (Esri, no tiene limites ni negocios)
             folium.TileLayer(
                 tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                 attr='Esri', name='Satelite Base', overlay=False
             ).add_to(m)
-            # Capa superior transparente solo con etiquetas de ciudades y carreteras
             folium.TileLayer(
                 tiles='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
                 attr='CartoDB', name='Etiquetas Limpias', overlay=True
