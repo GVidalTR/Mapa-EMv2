@@ -13,26 +13,26 @@ if 'hidden_promos' not in st.session_state:
 st.markdown("""
 <style>
 header[data-testid="stHeader"] { display: none !important; }
-.block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 98% !important; }
+.block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 99% !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
 p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin-bottom: 2px !important;}
 
 /* Header */
 .app-header {
-    background-color: #1e1e1e; padding: 10px 20px; 
+    background-color: #1e1e1e; padding: 8px 20px; 
     border-bottom: 2px solid #3a86ff; border-radius: 6px;
     margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
 }
-.app-title { font-size: 18px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
+.app-title { font-size: 16px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas de Promoción Compactas */
+/* Tarjetas de Promoción Compactas y Flexibles */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
-    padding: 6px 10px; margin-bottom: 2px; transition: all 0.2s;
-    height: 65px; display: flex; flex-direction: column; justify-content: center;
+    padding: 8px 10px; margin-bottom: 4px; transition: all 0.2s;
+    min-height: 70px; display: flex; flex-direction: column; justify-content: center;
 }
 .promo-card:hover { border-color: #3a86ff; }
-.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .promo-pill-ui {
     background-color: #3a86ff; color: white; border-radius: 10px;
     min-width: 26px; height: 18px; display: flex; justify-content: center;
@@ -42,25 +42,25 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
     font-weight: 700 !important; color: #ffffff !important; font-size: 11px !important; margin: 0 !important; 
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
 }
-.promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.2 !important; }
+.promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.3 !important; }
 .promo-details b { color: #ffffff !important; }
 
-/* Filtros */
-div[data-baseweb="select"] > div { background-color: #252525 !important; border-color: #3a3a3a !important; color: white !important; min-height: 28px !important;}
-div[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; border: none; }
-.stMultiSelect label { font-size: 11px !important; font-weight: bold !important; color: #e0e0e0 !important;}
+/* Filtros Ultra-Compactos */
+div[data-baseweb="select"] > div { background-color: #252525 !important; border-color: #3a3a3a !important; min-height: 24px !important; padding: 2px !important;}
+span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 9px !important; padding: 2px 4px !important; height: 18px !important; margin: 2px !important;}
+.stMultiSelect label { font-size: 10px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 0px !important;}
 
 /* Estilo Botones Discretos (Cruz y Tick) */
 div.stButton > button {
-    height: 26px; width: 100%; padding: 0px !important; font-size: 12px !important; 
-    background-color: transparent; border: 1px solid #404040; color: #a0a0a0; border-radius: 4px;
+    height: 20px; width: 20px; padding: 0px !important; font-size: 10px !important; 
+    background-color: transparent; border: 1px solid #3a3a3a; color: #666666; border-radius: 4px; display: flex; margin: auto;
 }
-div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
+div.stButton > button:hover { border-color: #ff4d4d; color: #ff4d4d; background-color: #1e1e1e; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- HEADER VISUAL ---
-st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:11px; color:#b0b0b0; margin:0;">Análisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:10px; color:#b0b0b0; margin:0;">Análisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
 
 # --- LÓGICA DE DATOS Y LIMPIEZA ---
 @st.cache_data
@@ -70,7 +70,6 @@ def load_data(file):
         df = pd.read_excel(xls, sheet_name='EEMM')
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # Identificamos columnas. Buscamos 'PROMOCI' para abarcar PROMOCION y PROMOCIÓN
         c = {
             'coord': next((x for x in df.columns if 'COORD' in x), None),
             'ref': next((x for x in df.columns if 'REF' in x), None),
@@ -80,7 +79,6 @@ def load_data(file):
             'planta': 'PLANTA', 'dorm': 'Nº DORM'
         }
         
-        # Fallbacks por si falta alguna de las dos
         if not c['ref']: c['ref'] = c['nombre']
         if not c['nombre']: c['nombre'] = c['ref']
 
@@ -104,7 +102,7 @@ def clean_dorm(x):
     return "-".join(sorted(list(items)))
 
 # --- LAYOUT DE COLUMNAS ---
-col_izq, col_mapa, col_der, col_ctrl = st.columns([1.1, 3.5, 1.1, 1])
+col_izq, col_mapa, col_der, col_ctrl = st.columns([1.1, 3.5, 1.1, 0.9])
 
 df_final = pd.DataFrame()
 ALTURA_CONTENEDOR = 820 
@@ -112,7 +110,6 @@ ALTURA_CONTENEDOR = 820
 # --- PANEL DERECHO (CONTROL Y FILTROS) ---
 with col_ctrl:
     with st.container(height=ALTURA_CONTENEDOR, border=False):
-        st.markdown("##### FUENTE DE DATOS")
         file = st.file_uploader("Subir Excel", type=['xlsx'], label_visibility="collapsed")
         
         mostrar_etiquetas = st.toggle("Mostrar Etiquetas Precio", value=True)
@@ -120,9 +117,6 @@ with col_ctrl:
         if file:
             df_raw, cols = load_data(file)
             if not df_raw.empty:
-                st.markdown("---")
-                st.markdown("##### FILTROS")
-                
                 def mk_filter(lbl, col_name):
                     if col_name and col_name in df_raw.columns:
                         opts = sorted(df_raw[col_name].dropna().unique().astype(str))
@@ -152,23 +146,19 @@ with col_ctrl:
                         cols['vrm']:'median' if cols['vrm'] in df_filtered.columns else 'first',
                         cols['pvp']:'mean' if cols['pvp'] in df_filtered.columns else 'first'
                     }
-                    
                     if cols['nombre'] and cols['nombre'] != cols['ref']:
                         agg_rules[cols['nombre']] = 'first'
-                        
                     if cols['dorm']: agg_rules[cols['dorm']] = clean_dorm
                     
                     df_promo = df_filtered.groupby(cols['ref']).agg(agg_rules).reset_index()
                     counts = df_filtered.groupby(cols['ref']).size().reset_index(name='UDS')
                     df_promo = pd.merge(df_promo, counts, on=cols['ref'])
                     
-                    # --- LÓGICA DE OCULTACIÓN ---
                     df_visible = df_promo[~df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
                     df_ocultos = df_promo[df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
 
                     st.markdown("---")
-                    # DEPÓSITO DE OCULTOS
-                    with st.expander(f"Comparables Ocultos ({len(df_ocultos)})"):
+                    with st.expander(f"📦 Ocultos ({len(df_ocultos)})"):
                         if not df_ocultos.empty:
                             if st.button("Restaurar Todos", use_container_width=True):
                                 st.session_state.hidden_promos.clear()
@@ -176,11 +166,8 @@ with col_ctrl:
                             
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
-                                
-                                # Extracción segura del nombre
                                 nombre_oculto = str(row.get(cols['nombre'], ref_oculta))
-                                if nombre_oculto.lower() in ['nan', 'none', '']: 
-                                    nombre_oculto = ref_oculta
+                                if nombre_oculto.lower() in ['nan', 'none', '']: nombre_oculto = ref_oculta
 
                                 cx_card, cx_btn = st.columns([0.85, 0.15], vertical_alignment="center")
                                 with cx_card:
@@ -190,50 +177,57 @@ with col_ctrl:
                                         st.session_state.hidden_promos.remove(ref_oculta)
                                         st.rerun()
                         else:
-                            st.caption("No hay promociones ocultas.")
+                            st.caption("Vacío.")
 
 # --- VISTA CENTRAL Y LATERALES ---
 if file and not df_filtered.empty:
     
-    def render_promo_card(row, is_hidden=False):
+    def render_promo_card(row, side="right"):
         ref_str = str(row[cols['ref']])
-        
-        # Extracción segura del nombre
         nombre_str = str(row.get(cols['nombre'], ref_str))
-        if nombre_str.lower() in ['nan', 'none', '']: 
-            nombre_str = ref_str
-            
+        if nombre_str.lower() in ['nan', 'none', '']: nombre_str = ref_str
         tipos = row.get(cols['dorm'], 'N/A')
         
-        c_card, c_btn = st.columns([0.88, 0.12], vertical_alignment="center")
-        
-        with c_card:
-            st.markdown(f"""
-            <div class="promo-card">
-                <div class="promo-header">
-                    <div class="promo-pill-ui">{ref_str}</div>
-                    <p class="promo-name" title="{nombre_str}">{nombre_str}</p>
-                </div>
-                <div class="promo-details">
-                    Uds: <b>{row['UDS']}</b> | <b>{row.get(cols['vrm'], 0):,.0f} €/m²</b><br>
-                    Med: <b>{row.get(cols['pvp'], 0):,.0f}€</b> | Tip: {tipos}
-                </div>
-            </div>""", unsafe_allow_html=True)
-            
-        with c_btn:
-            if not is_hidden:
-                if st.button("✕", key=f"hide_{ref_str}", help="Ocultar del mapa"):
+        card_html = f"""
+        <div class="promo-card">
+            <div class="promo-header">
+                <div class="promo-pill-ui">{ref_str}</div>
+                <p class="promo-name" title="{nombre_str}">{nombre_str}</p>
+            </div>
+            <div class="promo-details">
+                Uds: <b>{row['UDS']}</b> | <b>{row.get(cols['vrm'], 0):,.0f} €/m²</b><br>
+                Med: <b>{row.get(cols['pvp'], 0):,.0f}€</b> | Tip: {tipos}
+            </div>
+        </div>"""
+
+        # Colocación dinámica del botón "X" en los extremos
+        if side == "left":
+            c_btn, c_card = st.columns([0.1, 0.9], vertical_alignment="center")
+            with c_btn:
+                if st.button("✕", key=f"hide_{ref_str}"):
+                    st.session_state.hidden_promos.add(ref_str)
+                    st.rerun()
+            with c_card:
+                st.markdown(card_html, unsafe_allow_html=True)
+        else:
+            c_card, c_btn = st.columns([0.9, 0.1], vertical_alignment="center")
+            with c_card:
+                st.markdown(card_html, unsafe_allow_html=True)
+            with c_btn:
+                if st.button("✕", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
 
     mid = len(df_visible) // 2
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            for _, row in df_visible.iloc[:mid].iterrows(): render_promo_card(row)
+            for _, row in df_visible.iloc[:mid].iterrows(): 
+                render_promo_card(row, side="left")
 
     with col_der:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            for _, row in df_visible.iloc[mid:].iterrows(): render_promo_card(row)
+            for _, row in df_visible.iloc[mid:].iterrows(): 
+                render_promo_card(row, side="right")
 
     # Generar Mapa
     with col_mapa:
@@ -242,7 +236,7 @@ if file and not df_filtered.empty:
 
         folium.TileLayer(
             tiles=f"https://mt1.google.com/vt/lyrs=y&x={{x}}&y={{y}}&z={{z}}&apistyle={NO_POI_STYLE}",
-            attr="Google", name="Satélite Híbrido", control=True
+            attr="Google", name="Satélite", control=True
         ).add_to(m)
 
         folium.TileLayer(
