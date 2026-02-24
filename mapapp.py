@@ -70,16 +70,17 @@ def load_data(file):
         df = pd.read_excel(xls, sheet_name='EEMM')
         df.columns = [str(c).strip().upper() for c in df.columns]
         
+        # Identificamos columnas. Buscamos 'PROMOCI' para abarcar PROMOCION y PROMOCIÓN
         c = {
             'coord': next((x for x in df.columns if 'COORD' in x), None),
             'ref': next((x for x in df.columns if 'REF' in x), None),
-            'nombre': next((x for x in df.columns if any(k in x for k in ['PROMOCION', 'NOMBRE', 'PROYECTO'])), None),
+            'nombre': next((x for x in df.columns if any(k in x for k in ['PROMOCI', 'NOMBRE', 'PROYECTO'])), None),
             'vrm': 'VRM SCIC', 'pvp': 'PVP', 'tipo': next((x for x in df.columns if 'TIPOLOGI' in x), None),
             'tier': 'TIER', 'zona': 'ZONA', 'ciudad': next((x for x in df.columns if 'CIUDAD' in x), None),
             'planta': 'PLANTA', 'dorm': 'Nº DORM'
         }
         
-        # Compensar si falta el nombre o la referencia
+        # Fallbacks por si falta alguna de las dos
         if not c['ref']: c['ref'] = c['nombre']
         if not c['nombre']: c['nombre'] = c['ref']
 
@@ -146,14 +147,12 @@ with col_ctrl:
                 df_filtered = df_raw[mask]
                 
                 if not df_filtered.empty:
-                    # Lógica ajustada para evitar el ValueError de columnas duplicadas
                     agg_rules = {
                         'lat':'first', 'lon':'first', 
                         cols['vrm']:'median' if cols['vrm'] in df_filtered.columns else 'first',
                         cols['pvp']:'mean' if cols['pvp'] in df_filtered.columns else 'first'
                     }
                     
-                    # Solo añadimos 'nombre' si es distinto a 'ref' para no sobreescribir
                     if cols['nombre'] and cols['nombre'] != cols['ref']:
                         agg_rules[cols['nombre']] = 'first'
                         
@@ -177,7 +176,12 @@ with col_ctrl:
                             
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
-                                nombre_oculto = str(row[cols['nombre']]) if cols['nombre'] in row else ref_oculta
+                                
+                                # Extracción segura del nombre
+                                nombre_oculto = str(row.get(cols['nombre'], ref_oculta))
+                                if nombre_oculto.lower() in ['nan', 'none', '']: 
+                                    nombre_oculto = ref_oculta
+
                                 cx_card, cx_btn = st.columns([0.85, 0.15], vertical_alignment="center")
                                 with cx_card:
                                     st.markdown(f"<div style='background:#1e1e1e; padding:5px; border-radius:4px; margin-bottom:4px;'><span style='font-size:10px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span> <span style='font-size:10px; color:#aaa;'>{nombre_oculto[:15]}...</span></div>", unsafe_allow_html=True)
@@ -193,7 +197,12 @@ if file and not df_filtered.empty:
     
     def render_promo_card(row, is_hidden=False):
         ref_str = str(row[cols['ref']])
-        nombre_str = str(row[cols['nombre']]) if cols['nombre'] in row else ref_str
+        
+        # Extracción segura del nombre
+        nombre_str = str(row.get(cols['nombre'], ref_str))
+        if nombre_str.lower() in ['nan', 'none', '']: 
+            nombre_str = ref_str
+            
         tipos = row.get(cols['dorm'], 'N/A')
         
         c_card, c_btn = st.columns([0.88, 0.12], vertical_alignment="center")
