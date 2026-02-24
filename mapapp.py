@@ -4,9 +4,15 @@ import folium
 from streamlit_folium import st_folium
 import io
 import zipfile
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+
+# Proteccion por si matplotlib no esta instalado en el servidor
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_INSTALLED = True
+except ImportError:
+    MATPLOTLIB_INSTALLED = False
 
 # --- CONFIGURACION DE PAGINA Y MEMORIA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
@@ -26,6 +32,9 @@ header[data-testid="stHeader"] { display: none !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
 p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin-bottom: 2px !important;}
 
+/* Forzar la reduccion del espacio nativo entre bloques de Streamlit */
+[data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
+
 /* Header */
 .app-header {
     background-color: #1e1e1e; padding: 8px 20px; 
@@ -34,45 +43,49 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 16px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas base (Totalmente compactadas) */
+/* Tarjetas base (Tamano legible pero sin espacio exterior) */
 .promo-card {
-    background-color: #252525; border: 1px solid #3a3a3a; border-radius: 4px;
-    padding: 6px 8px; margin-bottom: 2px !important; transition: all 0.2s;
-    min-height: 60px; display: flex; flex-direction: column; justify-content: center; position: relative;
+    background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
+    padding: 8px 10px; margin-bottom: 0px !important; transition: all 0.2s;
+    min-height: 65px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
-.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; padding-right: 15px;}
+.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 5px;}
 .promo-pill-ui {
-    background-color: #3a86ff; color: white; border-radius: 8px;
-    min-width: 24px; height: 16px; display: flex; justify-content: center;
-    align-items: center; font-size: 9px; font-weight: bold; flex-shrink: 0; padding: 0 4px;
+    background-color: #3a86ff; color: white; border-radius: 10px;
+    min-width: 26px; height: 18px; display: flex; justify-content: center;
+    align-items: center; font-size: 10px; font-weight: bold; flex-shrink: 0; padding: 0 5px;
 }
 .promo-name { 
-    font-weight: 700 !important; color: #ffffff !important; font-size: 10px !important; margin: 0 !important; 
+    font-weight: 700 !important; color: #ffffff !important; font-size: 11px !important; margin: 0 !important; 
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
 }
-.promo-details { font-size: 9px !important; color: #b0b0b0 !important; line-height: 1.2 !important; }
+.promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.3 !important; }
 .promo-details b { color: #ffffff !important; }
 
-/* Filtros y Selectores Minimizados al Extremo */
+/* Filtros y Selectores (Expandibles para ver todos los tags) */
 div[data-baseweb="select"] > div { 
     background-color: #252525 !important; border-color: #3a3a3a !important; 
-    min-height: 22px !important; height: 22px !important; 
-    padding-top: 0px !important; padding-bottom: 0px !important; 
+    min-height: 28px !important; padding: 2px 4px !important; 
 }
-div[data-baseweb="select"] span { font-size: 10px !important; }
-span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 8px !important; padding: 1px 3px !important; height: 16px !important; margin: 1px !important;}
-.stMultiSelect label { font-size: 9px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 0px !important;}
+div[data-baseweb="select"] span { font-size: 11px !important; }
+span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 10px !important; padding: 2px 6px !important; height: auto !important; margin: 2px !important;}
+.stMultiSelect label { font-size: 11px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 2px !important;}
 
-/* Botones Nativos Streamlit */
+/* Botones Nativos Globales */
 div.stButton > button {
     padding: 2px 4px !important; font-size: 10px !important; min-height: 24px !important;
     background-color: transparent; border: 1px solid #3a3a3a; color: #a0a0a0; border-radius: 4px; display: flex; margin: auto;
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 
-/* Boton X de la Tarjeta */
-.btn-micro > div > button { height: 16px !important; width: 16px !important; font-size: 8px !important; border: none !important;}
+/* Boton X Microscopico de la Tarjeta */
+.btn-micro > div > button { 
+    height: 16px !important; width: 16px !important; min-height: 16px !important; 
+    font-size: 8px !important; border: none !important; padding: 0 !important; 
+    color: #555555 !important; background: transparent !important;
+}
+.btn-micro > div > button:hover { color: #ff4d4d !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -117,7 +130,6 @@ def clean_dorm(x):
             items.add(s)
     return "-".join(sorted(list(items)))
 
-# Generador de Imagenes ZIP a Medida
 def generate_zip_images(df, cols):
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -162,7 +174,7 @@ def generate_zip_images(df, cols):
     return zip_buffer
 
 # --- LAYOUT DE COLUMNAS ---
-col_izq, col_mapa, col_der, col_ctrl = st.columns([1, 4, 1, 0.9])
+col_izq, col_mapa, col_der, col_ctrl = st.columns([1, 4.2, 1, 1.1])
 
 df_final = pd.DataFrame()
 ALTURA_CONTENEDOR = 820 
@@ -175,7 +187,7 @@ with col_ctrl:
         if file:
             mostrar_etiquetas = st.toggle("Ver Precios", value=True)
             
-            st.markdown("<p style='font-size:9px; font-weight:bold; margin-bottom:0px; margin-top:5px; color:#a0a0a0;'>MAPA</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:9px; font-weight:bold; margin-bottom:0px; margin-top:5px; color:#a0a0a0;'>CONTROLES DE MAPA</p>", unsafe_allow_html=True)
             c_map1, c_map2 = st.columns(2)
             with c_map1:
                 tipo_vista = st.selectbox("Vista", ["Callejero", "Satelite"], label_visibility="collapsed")
@@ -259,14 +271,18 @@ with col_ctrl:
 
                     st.markdown("---")
                     
-                    zip_data = generate_zip_images(df_visible, cols)
-                    st.download_button(
-                        label="Descargar Fichas PNG (.zip)",
-                        data=zip_data,
-                        file_name="fichas_comparables.zip",
-                        mime="application/zip",
-                        use_container_width=True
-                    )
+                    # Generacion de ZIP protegida
+                    if MATPLOTLIB_INSTALLED:
+                        zip_data = generate_zip_images(df_visible, cols)
+                        st.download_button(
+                            label="Descargar Fichas PNG (.zip)",
+                            data=zip_data,
+                            file_name="fichas_comparables.zip",
+                            mime="application/zip",
+                            use_container_width=True
+                        )
+                    else:
+                        st.caption("Falta instalar 'matplotlib' para exportar a ZIP. Revisa requirements.txt.")
 
                     st.markdown("---")
                     with st.expander(f"Ocultos ({len(df_ocultos)})"):
@@ -309,7 +325,7 @@ if file and not df_filtered.empty:
         </div>"""
 
         if side == "left":
-            c_btn, c_card = st.columns([0.12, 0.88], vertical_alignment="center")
+            c_btn, c_card = st.columns([0.08, 0.92], vertical_alignment="center")
             with c_btn:
                 st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
                 if st.button("X", key=f"hide_{ref_str}"):
@@ -319,7 +335,7 @@ if file and not df_filtered.empty:
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
         else:
-            c_card, c_btn = st.columns([0.88, 0.12], vertical_alignment="center")
+            c_card, c_btn = st.columns([0.92, 0.08], vertical_alignment="center")
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
             with c_btn:
@@ -348,17 +364,16 @@ if file and not df_filtered.empty:
             for _, row in right_df.iterrows():
                 render_promo_card(row, "right")
 
-    # MAPA
+    # MAPA CON CARTODB y ESRI
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
-        # Volvemos a CartoDB y Esri: Limpio, rapido y sin negocios
         if tipo_vista == "Callejero":
             if estilo_mapa == "Estandar":
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
             elif estilo_mapa == "Escala de Grises":
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-            else: # Azul Oscuro
+            else: 
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
             
             folium.TileLayer(tiles=tiles_url, attr='CartoDB', name='Callejero', overlay=False).add_to(m)
