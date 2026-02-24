@@ -40,7 +40,7 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 18px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas base: SEPARACIÓN RESTAURADA (margin-bottom: 12px) */
+/* Tarjetas base: Separación correcta (12px) */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
     padding: 8px 10px; margin-bottom: 12px !important; transition: all 0.2s;
@@ -76,12 +76,12 @@ div.stButton > button {
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 
-/* Botón X Microscópico */
+/* Botón X PEQUEÑÍSIMO (15px) */
 .btn-micro { display: flex; justify-content: center; align-items: center; height: 100%; width: 100%; padding-top: 15px; }
 .btn-micro > div > button { 
-    height: 18px !important; width: 18px !important; min-height: 18px !important; 
-    font-size: 9px !important; border: 1px solid #555555 !important; border-radius: 50% !important; 
-    padding: 0 !important; color: #888888 !important; background: #1e1e1e !important; 
+    height: 15px !important; width: 15px !important; min-height: 15px !important; 
+    font-size: 8px !important; border: 1px solid #444444 !important; border-radius: 50% !important; 
+    padding: 0 !important; color: #777777 !important; background: #1e1e1e !important; 
     display: flex; align-items: center; justify-content: center;
 }
 .btn-micro > div > button:hover { color: #ff4d4d !important; border-color: #ff4d4d !important; background-color: rgba(255,77,77,0.1) !important;}
@@ -153,6 +153,7 @@ def generate_zip_images(df, cols):
             ax.text(0.25, 0.40, f"{uds}", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             ax.text(0.48, 0.40, "PVP Medio:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
             ax.text(0.72, 0.40, f"{pvp:,.0f} €", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
+            
             ax.text(0.05, 0.15, "Unitario:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
             ax.text(0.25, 0.15, f"{vrm:,.0f} €/m²", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             ax.text(0.48, 0.15, "Tipologías:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
@@ -350,7 +351,6 @@ if file and not df_filtered.empty:
 
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            # Pintado directo, dejando a Streamlit respetar los márgenes CSS naturales
             for _, row in left_df.iterrows():
                 render_promo_card(row, "left")
 
@@ -359,7 +359,7 @@ if file and not df_filtered.empty:
             for _, row in right_df.iterrows():
                 render_promo_card(row, "right")
 
-    # MAPA NATIVO Y ESTABLE (Se recarga de forma normal, sin hacks que rompan la página)
+    # MAPA ESTÁNDAR Y ROBUSTO (Sin caché compleja que cause parpadeos)
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
