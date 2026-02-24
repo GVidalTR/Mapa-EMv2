@@ -6,7 +6,7 @@ from streamlit_folium import st_folium
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
 
-# --- ESTILOS CSS TEMA OSCURO (Para el Dashboard, no afecta al mapa) ---
+# --- ESTILOS CSS TEMA OSCURO ---
 st.markdown("""
 <style>
 header[data-testid="stHeader"] { display: none !important; }
@@ -27,10 +27,11 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .promo-card:hover { border-color: #3a86ff; }
 .promo-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.promo-circle-ui {
-    background-color: #3a86ff; color: white; border-radius: 50%;
-    width: 24px; height: 24px; display: flex; justify-content: center;
+.promo-pill-ui {
+    background-color: #3a86ff; color: white; border-radius: 12px;
+    min-width: 32px; height: 24px; display: flex; justify-content: center;
     align-items: center; font-size: 11px; font-weight: bold; flex-shrink: 0;
+    padding: 0 8px;
 }
 .promo-name { font-weight: 700 !important; color: #ffffff !important; font-size: 13px !important; margin: 0 !important; }
 .promo-details { font-size: 11px !important; color: #b0b0b0 !important; line-height: 1.6 !important; }
@@ -124,11 +125,15 @@ with col_ctrl:
 # --- VISTA CENTRAL Y LATERALES ---
 if file and not df_final.empty:
     
-    def render_promo_cards(data, start_idx):
+    def render_promo_cards(data):
         for i, row in data.iterrows():
+            ref_str = str(row[cols['ref']])
             st.markdown(f"""
             <div class="promo-card">
-                <div class="promo-header"><div class="promo-circle-ui">{start_idx+i+1}</div><p class="promo-name">{row[cols['ref']]}</p></div>
+                <div class="promo-header">
+                    <div class="promo-pill-ui">{ref_str}</div>
+                    <p class="promo-name">{ref_str}</p>
+                </div>
                 <div class="promo-details">
                     Uds: <b>{row['UDS']}</b> | PVP med: <b>{row.get(cols['pvp'], 0):,.0f}€</b><br>
                     Unitario: <b>{row.get(cols['vrm'], 0):,.0f} €/m²</b><br>
@@ -139,27 +144,30 @@ if file and not df_final.empty:
     mid = len(df_promo) // 2
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            render_promo_cards(df_promo.iloc[:mid], 0)
+            render_promo_cards(df_promo.iloc[:mid])
 
     with col_der:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            render_promo_cards(df_promo.iloc[mid:], mid)
+            render_promo_cards(df_promo.iloc[mid:])
 
-    # Generar Mapa (Capas robustas de Google)
+    # Generar Mapa (Capas robustas de Google Sin Comercios)
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=True)
         
-        # Capa Satélite Híbrido Estándar (Fiable)
+        # Parámetro mágico para ocultar puntos de interés (POIs) en Google Maps
+        NO_POI_STYLE = "s.t%3A3%7Cp.v%3Aoff"
+
+        # Capa Satélite Híbrido Estándar sin Comercios
         folium.TileLayer(
-            tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+            tiles=f"https://mt1.google.com/vt/lyrs=y&x={{x}}&y={{y}}&z={{z}}&apistyle={NO_POI_STYLE}",
             attr="Google",
             name="Satélite Híbrido",
             control=True
         ).add_to(m)
 
-        # Capa Callejero Estándar (Fiable)
+        # Capa Callejero Estándar sin Comercios
         folium.TileLayer(
-            tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+            tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&apistyle={NO_POI_STYLE}",
             attr="Google",
             name="Callejero",
             control=True
@@ -169,34 +177,30 @@ if file and not df_final.empty:
         m.fit_bounds([sw, ne])
         
         for i, row in df_promo.iterrows():
+            ref_str = str(row[cols['ref']])
             val_vrm = row.get(cols['vrm'], 0)
             
-            # Marcador 1: El círculo azul con el número (Estilos en línea forzados)
-            circle_html = f"""
-            <div style="background-color: #3a86ff; color: white; border-radius: 50%; width: 24px; height: 24px; 
-                        display: flex; justify-content: center; align-items: center; font-size: 11px; 
-                        font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-                        font-family: Arial, sans-serif;">
-                {i+1}
+            # Etiqueta Todo-En-Uno (Píldora Azul con Ref + Caja Blanca con Precio)
+            # Esto evita solapamientos y garantiza que los fondos se vean perfectos
+            combined_html = f"""
+            <div style="display: flex; align-items: center; drop-shadow: 0 3px 6px rgba(0,0,0,0.5); font-family: Arial, sans-serif;">
+                <div style="background-color: #3a86ff; color: white; border-radius: 12px; min-width: 32px; height: 24px; 
+                            display: flex; justify-content: center; align-items: center; font-size: 11px; 
+                            font-weight: bold; border: 2px solid white; z-index: 2; padding: 0 6px;">
+                    {ref_str}
+                </div>
+                <div style="background-color: white; border: 2px solid #3a86ff; border-radius: 4px; 
+                            padding: 2px 8px 2px 12px; margin-left: -10px; font-size: 11px; font-weight: bold; 
+                            color: #121212; white-space: nowrap; z-index: 1;">
+                    {val_vrm:,.0f} €/m²
+                </div>
             </div>
             """
-            folium.Marker(
-                [row['lat'], row['lon']], 
-                icon=folium.DivIcon(html=circle_html, icon_anchor=(12, 12))
-            ).add_to(m)
             
-            # Marcador 2: La etiqueta de precio (Estilos en línea forzados)
-            label_html = f"""
-            <div style="background-color: white; border: 2px solid #3a86ff; border-radius: 4px; 
-                        padding: 3px 6px; font-size: 11px; font-weight: bold; color: #121212; 
-                        white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.4); 
-                        font-family: Arial, sans-serif;">
-                {val_vrm:,.0f} €/m²
-            </div>
-            """
+            # Ajustamos el icon_anchor para que el centro de la píldora apunte a la coordenada
             folium.Marker(
                 [row['lat'], row['lon']], 
-                icon=folium.DivIcon(html=label_html, icon_anchor=(-15, 12))
+                icon=folium.DivIcon(html=combined_html, icon_anchor=(16, 12))
             ).add_to(m)
 
         folium.LayerControl(position='topright').add_to(m)
