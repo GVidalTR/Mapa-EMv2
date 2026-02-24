@@ -21,8 +21,6 @@ if 'hidden_promos' not in st.session_state:
     st.session_state.hidden_promos = set()
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
-if 'do_filter_view' not in st.session_state:
-    st.session_state.do_filter_view = False
 
 # --- ESTILOS CSS TEMA OSCURO ---
 st.markdown("""
@@ -32,6 +30,9 @@ header[data-testid="stHeader"] { display: none !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
 p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin-bottom: 2px !important;}
 
+/* Forzar reducción de espacios nativos de Streamlit para controlar nosotros la separación */
+[data-testid="stVerticalBlock"] { gap: 0rem !important; }
+
 /* Header */
 .app-header {
     background-color: #1e1e1e; padding: 12px 20px; 
@@ -40,10 +41,10 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 18px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas base: Separación correcta (12px) */
+/* Tarjetas (Sin margen inferior CSS, el margen se lo damos por Python para que sea inquebrantable) */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
-    padding: 8px 10px; margin-bottom: 12px !important; transition: all 0.2s;
+    padding: 8px 10px; transition: all 0.2s;
     min-height: 65px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
@@ -76,12 +77,12 @@ div.stButton > button {
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 
-/* Botón X PEQUEÑÍSIMO (15px) */
+/* Botón X AÚN MÁS MINÚSCULO (12px) */
 .btn-micro { display: flex; justify-content: center; align-items: center; height: 100%; width: 100%; padding-top: 15px; }
 .btn-micro > div > button { 
-    height: 15px !important; width: 15px !important; min-height: 15px !important; 
-    font-size: 8px !important; border: 1px solid #444444 !important; border-radius: 50% !important; 
-    padding: 0 !important; color: #777777 !important; background: #1e1e1e !important; 
+    height: 12px !important; width: 12px !important; min-height: 12px !important; 
+    font-size: 7px !important; border: 1px solid #444444 !important; border-radius: 50% !important; 
+    padding: 0 !important; color: #666666 !important; background: #1e1e1e !important; 
     display: flex; align-items: center; justify-content: center;
 }
 .btn-micro > div > button:hover { color: #ff4d4d !important; border-color: #ff4d4d !important; background-color: rgba(255,77,77,0.1) !important;}
@@ -136,7 +137,6 @@ def generate_zip_images(df, cols):
             ref = str(row[cols['ref']])
             nombre = str(row.get(cols['nombre'], ref))
             if nombre.lower() in ['nan', 'none', '']: nombre = ref
-            
             uds = row['UDS']
             pvp = row.get(cols['pvp'], 0)
             vrm = row.get(cols['vrm'], 0)
@@ -144,7 +144,6 @@ def generate_zip_images(df, cols):
             
             fig, ax = plt.subplots(figsize=(5.6, 1.8), dpi=200)
             ax.axis('off')
-            
             ax.add_patch(plt.Rectangle((0, 0), 1, 1, facecolor='#ffffff', edgecolor='#cccccc', linewidth=2, transform=ax.transAxes))
             ax.add_patch(plt.Rectangle((0, 0), 0.02, 1, facecolor='#3a86ff', transform=ax.transAxes))
             
@@ -153,7 +152,6 @@ def generate_zip_images(df, cols):
             ax.text(0.25, 0.40, f"{uds}", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             ax.text(0.48, 0.40, "PVP Medio:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
             ax.text(0.72, 0.40, f"{pvp:,.0f} €", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
-            
             ax.text(0.05, 0.15, "Unitario:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
             ax.text(0.25, 0.15, f"{vrm:,.0f} €/m²", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             ax.text(0.48, 0.15, "Tipologías:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
@@ -163,11 +161,42 @@ def generate_zip_images(df, cols):
             plt.savefig(img_buf, format='png', bbox_inches='tight', pad_inches=0.02)
             plt.close(fig)
             img_buf.seek(0)
-            
             zip_file.writestr(f"Ficha_{ref}.png", img_buf.read())
             
     zip_buffer.seek(0)
     return zip_buffer
+
+# --- FUNCIÓN GENERADORA DE ETIQUETAS INTELIGENTES ---
+def build_smart_marker_html(ref_str, val_vrm, direction, show_price):
+    if not show_price:
+        return f"""
+        <div style="drop-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: Arial, sans-serif;">
+            <div style="background-color: #3a86ff; color: white; border-radius: 12px; min-width: 26px; height: 20px; 
+                        display: flex; justify-content: center; align-items: center; font-size: 10px; 
+                        font-weight: bold; border: 1.5px solid white; padding: 0 4px;">
+                {ref_str}
+            </div>
+        </div>
+        """
+        
+    # Lógica de posicionamiento absoluto para mantener el "ancla" siempre en la píldora
+    align_prop = "left" if direction == "right" else "right"
+    pad_prop = "1px 6px 1px 12px" if direction == "right" else "1px 12px 1px 6px"
+    
+    return f"""
+    <div style="position: relative; width: 26px; height: 20px; font-family: Arial, sans-serif;">
+        <div style="position: absolute; {align_prop}: 15px; top: 0px; background-color: white; 
+                    border: 1.5px solid #3a86ff; border-radius: 4px; padding: {pad_prop}; 
+                    font-size: 10px; font-weight: bold; color: #121212; white-space: nowrap; z-index: 1;">
+            {val_vrm:,.0f} €/m²
+        </div>
+        <div style="position: absolute; left: 0; top: 0; background-color: #3a86ff; color: white; border-radius: 12px;
+                    min-width: 26px; height: 20px; display: flex; justify-content: center; align-items: center;
+                    font-size: 10px; font-weight: bold; border: 1.5px solid white; z-index: 2; padding: 0 4px;">
+            {ref_str}
+        </div>
+    </div>
+    """
 
 # --- LAYOUT DE COLUMNAS ---
 col_izq, col_mapa, col_der, col_ctrl = st.columns([1.1, 4, 1.1, 1.1])
@@ -179,6 +208,7 @@ ALTURA_CONTENEDOR = 820
 with col_ctrl:
     with st.container(height=ALTURA_CONTENEDOR, border=False):
         file = st.file_uploader("Subir Excel", type=['xlsx'], label_visibility="collapsed")
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
         
         if file:
             mostrar_etiquetas = st.toggle("Ver Precios", value=True)
@@ -201,9 +231,6 @@ with col_ctrl:
                 if st.button("Reset Ocultos", use_container_width=True):
                     st.session_state.hidden_promos.clear()
                     st.rerun()
-            
-            if st.button("Filtrar vista", use_container_width=True):
-                st.session_state.do_filter_view = True
 
             st.markdown("---")
 
@@ -216,10 +243,15 @@ with col_ctrl:
                     return []
                 
                 f_tipo = mk_filter("Tipología", cols['tipo'], "tipo")
+                st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
                 f_tier = mk_filter("Tier", cols['tier'], "tier")
+                st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
                 f_zona = mk_filter("Zona", cols['zona'], "zona")
+                st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
                 f_ciudad = mk_filter("Ciudad", cols['ciudad'], "ciudad")
+                st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
                 f_planta = mk_filter("Planta", cols['planta'], "planta")
+                st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
                 f_dorm = mk_filter("Dormitorios", cols['dorm'], "dorm")
 
                 mask = pd.Series(True, index=df_raw.index)
@@ -245,22 +277,6 @@ with col_ctrl:
                     df_promo = df_filtered.groupby(cols['ref']).agg(agg_rules).reset_index()
                     counts = df_filtered.groupby(cols['ref']).size().reset_index(name='UDS')
                     df_promo = pd.merge(df_promo, counts, on=cols['ref'])
-
-                    if st.session_state.do_filter_view:
-                        st.session_state.do_filter_view = False
-                        map_data = st.session_state.get("main_map")
-                        
-                        if map_data and map_data.get("bounds"):
-                            b = map_data["bounds"]
-                            sw_lat, sw_lon = b['_southWest']['lat'], b['_southWest']['lng']
-                            ne_lat, ne_lon = b['_northEast']['lat'], b['_northEast']['lng']
-                            
-                            for _, row in df_promo.iterrows():
-                                lat, lon = row['lat'], row['lon']
-                                ref = str(row[cols['ref']])
-                                if not (sw_lat <= lat <= ne_lat and sw_lon <= lon <= ne_lon):
-                                    st.session_state.hidden_promos.add(ref)
-                            st.rerun()
                     
                     df_visible = df_promo[~df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
                     df_ocultos = df_promo[df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
@@ -276,8 +292,6 @@ with col_ctrl:
                             mime="application/zip",
                             use_container_width=True
                         )
-                    else:
-                        st.caption("Falta 'matplotlib' en requirements.txt para descargar ZIP.")
 
                     st.markdown("---")
                     with st.expander(f"Ocultos ({len(df_ocultos)})"):
@@ -320,7 +334,7 @@ if file and not df_filtered.empty:
         </div>"""
 
         if side == "left":
-            c_btn, c_card = st.columns([0.15, 0.85], vertical_alignment="center")
+            c_btn, c_card = st.columns([0.10, 0.90], vertical_alignment="center")
             with c_btn:
                 st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
                 if st.button("✕", key=f"hide_{ref_str}"):
@@ -330,7 +344,7 @@ if file and not df_filtered.empty:
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
         else:
-            c_card, c_btn = st.columns([0.85, 0.15], vertical_alignment="center")
+            c_card, c_btn = st.columns([0.90, 0.10], vertical_alignment="center")
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
             with c_btn:
@@ -339,6 +353,9 @@ if file and not df_filtered.empty:
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Espaciador inquebrantable controlado por Python
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     TOTAL_CARDS = len(df_visible)
     MAX_LEFT_CAPACITY = 10
@@ -351,15 +368,15 @@ if file and not df_filtered.empty:
 
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            for _, row in left_df.iterrows():
-                render_promo_card(row, "left")
+            st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
+            for _, row in left_df.iterrows(): render_promo_card(row, "left")
 
     with col_der:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            for _, row in right_df.iterrows():
-                render_promo_card(row, "right")
+            st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
+            for _, row in right_df.iterrows(): render_promo_card(row, "right")
 
-    # MAPA ESTÁNDAR Y ROBUSTO (Sin caché compleja que cause parpadeos)
+    # MAPA NATIVO Y FLUIDO CON SISTEMA ANTI-COLISIÓN DE ETIQUETAS
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
@@ -370,9 +387,7 @@ if file and not df_filtered.empty:
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
             else: 
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            
             folium.TileLayer(tiles=tiles_url, attr='CartoDB', name='Callejero', overlay=False).add_to(m)
-            
         else: # Satélite
             folium.TileLayer(
                 tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -384,46 +399,56 @@ if file and not df_filtered.empty:
             ).add_to(m)
 
         if not df_visible.empty:
-            if not st.session_state.get('do_filter_view'):
-                sw, ne = df_visible[['lat', 'lon']].min().values.tolist(), df_visible[['lat', 'lon']].max().values.tolist()
-                m.fit_bounds([sw, ne])
+            sw, ne = df_visible[['lat', 'lon']].min().values.tolist(), df_visible[['lat', 'lon']].max().values.tolist()
+            m.fit_bounds([sw, ne])
+            
+            # --- ALGORITMO DE ANTI-SOLAPAMIENTO (JITTER & FLIP) ---
+            processed_markers = []
+            CLUSTER_THRESHOLD = 0.0025 # Distancia en grados para considerar que están "pegados" (~250m)
             
             for i, row in df_visible.iterrows():
                 ref_str = str(row[cols['ref']])
                 val_vrm = row.get(cols['vrm'], 0)
+                current_lat = row['lat']
+                current_lon = row['lon']
                 
-                if mostrar_etiquetas:
-                    marker_html = f"""
-                    <div style="display: flex; align-items: center; drop-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: Arial, sans-serif;">
-                        <div style="background-color: #3a86ff; color: white; border-radius: 12px; min-width: 28px; height: 20px; 
-                                    display: flex; justify-content: center; align-items: center; font-size: 10px; 
-                                    font-weight: bold; border: 1.5px solid white; z-index: 2; padding: 0 4px;">
-                            {ref_str}
-                        </div>
-                        <div style="background-color: white; border: 1.5px solid #3a86ff; border-radius: 4px; 
-                                    padding: 1px 6px 1px 10px; margin-left: -8px; font-size: 10px; font-weight: bold; 
-                                    color: #121212; white-space: nowrap; z-index: 1;">
-                            {val_vrm:,.0f} €/m²
-                        </div>
-                    </div>
-                    """
-                else:
-                    marker_html = f"""
-                    <div style="drop-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: Arial, sans-serif;">
-                        <div style="background-color: #3a86ff; color: white; border-radius: 12px; min-width: 28px; height: 20px; 
-                                    display: flex; justify-content: center; align-items: center; font-size: 10px; 
-                                    font-weight: bold; border: 1.5px solid white; padding: 0 4px;">
-                            {ref_str}
-                        </div>
-                    </div>
-                    """
+                direction = "right" # Por defecto miran hacia la derecha
+                lat_offset = 0
+                lon_offset = 0
+                
+                # Buscar vecinos cercanos ya procesados
+                neighbors = []
+                for p in processed_markers:
+                    # Distancia Euclidiana simple
+                    dist = ((current_lat - p['lat'])**2 + (current_lon - p['lon'])**2)**0.5
+                    if dist < CLUSTER_THRESHOLD:
+                        neighbors.append(p)
+                
+                if neighbors:
+                    dirs_taken = [n['dir'] for n in neighbors]
+                    if "right" in dirs_taken and "left" not in dirs_taken:
+                        direction = "left" # Hacemos "Flip" a la izquierda
+                    elif "right" in dirs_taken and "left" in dirs_taken:
+                        # Si hay 3 o más en el mismo sitio exacto, aplicamos un micro-desplazamiento en abanico
+                        direction = "right" if len(neighbors) % 2 == 0 else "left"
+                        lat_offset = 0.0004 * len(neighbors) # Desplaza ~40 metros al norte
+                        lon_offset = 0.0004 * len(neighbors) # Desplaza ~40 metros al este
+                
+                final_lat = current_lat + lat_offset
+                final_lon = current_lon + lon_offset
+                
+                processed_markers.append({'lat': final_lat, 'lon': final_lon, 'dir': direction})
+                
+                # Construimos el marcador inteligente
+                marker_html = build_smart_marker_html(ref_str, val_vrm, direction, mostrar_etiquetas)
                 
                 folium.Marker(
-                    [row['lat'], row['lon']], 
-                    icon=folium.DivIcon(html=marker_html, icon_anchor=(14, 10))
+                    [final_lat, final_lon], 
+                    icon=folium.DivIcon(html=marker_html, icon_anchor=(13, 10)) # El ancla siempre es el centro de la píldora
                 ).add_to(m)
 
-        st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map")
+        # PARA EVITAR EL PARPADEO GRIS: Prohibimos al mapa mandar datos a Python en cada pixel que se mueve.
+        st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map", returned_objects=[])
 
 else:
     with col_mapa:
