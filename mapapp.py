@@ -2,57 +2,61 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
-import googlemaps
 from folium.plugins import Fullscreen
 
-# --- CONFIGURACIÓN DE PÁGINA (ESTRICTO SIN SCROLL) ---
-st.set_page_config(page_title="PropTech Analytics", layout="wide", initial_sidebar_state="collapsed")
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Generador Mapas EM", layout="wide", initial_sidebar_state="collapsed")
 
+# --- ESTILOS CSS AVANZADOS ---
 st.markdown("""
     <style>
-    /* Reset total de márgenes */
-    [data-testid="stHeader"], .block-container { padding: 0rem !important; }
+    /* Reset total y fondo */
+    [data-testid="stHeader"], .block-container { padding: 0 !important; }
     html, body, [data-testid="stAppViewContainer"] { 
-        overflow: hidden; height: 100vh; background-color: #ffffff; 
+        overflow: hidden; height: 100vh; background-color: #f4f7f9; 
     }
     
-    /* Contenedores laterales con altura fija y scroll */
-    .column-scroll { 
-        height: 98vh; overflow-y: auto; padding: 10px; border-right: 1px solid #eee;
+    /* Header Profesional */
+    .app-header {
+        background-color: #001f3f; padding: 12px 25px; color: white;
+        display: flex; justify-content: space-between; align-items: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); height: 60px;
     }
-    
-    /* Cuadros de datos comprimidos (Estilo imagen) */
+    .app-title { font-size: 22px; font-weight: 800; letter-spacing: 1px; margin: 0; }
+
+    /* Tarjetas de Promoción (Estilo Solicitado) */
     .promo-card {
-        background-color: #eef6ff; border: 1.5px solid #d1e3f8; border-radius: 8px;
-        padding: 8px; margin-bottom: 8px; font-family: 'Helvetica', sans-serif;
+        background-color: #eef6ff; border: 1.5px solid #bbdefb; border-radius: 8px;
+        padding: 10px; margin-bottom: 10px; transition: 0.3s;
     }
-    .promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    .promo-number {
-        background-color: #003366; color: white; border-radius: 50%;
-        width: 20px; height: 20px; display: flex; justify-content: center;
+    .promo-card:hover { border-color: #0d47a1; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .promo-circle {
+        background-color: #001f3f; color: white; border-radius: 50%;
+        width: 22px; height: 22px; display: flex; justify-content: center;
         align-items: center; font-size: 11px; font-weight: bold; flex-shrink: 0;
     }
-    .promo-title { font-weight: 700; color: #003366; font-size: 12px; margin: 0; line-height: 1.1; }
-    .promo-info { font-size: 11px; line-height: 1.3; color: #444; }
-    
-    /* Etiquetas del mapa (Recuadro Blanco) */
+    .promo-name { font-weight: 700; color: #001f3f; font-size: 13px; margin: 0; line-height: 1.2;}
+    .promo-details { font-size: 11px; color: #444; line-height: 1.5; }
+
+    /* Etiquetas del Mapa */
     .map-label {
-        background: white !important; border: 2px solid #003366 !important; border-radius: 4px !important;
-        padding: 2px 6px !important; font-size: 11px !important; font-weight: bold !important; 
-        color: #003366 !important; white-space: nowrap !important; 
-        box-shadow: 2px 2px 6px rgba(0,0,0,0.3) !important;
-        display: block !important;
+        background: white !important; border: 2px solid #001f3f !important;
+        border-radius: 4px !important; padding: 2px 6px !important;
+        font-size: 11px !important; font-weight: bold !important;
+        color: #001f3f !important; box-shadow: 2px 2px 5px rgba(0,0,0,0.3) !important;
+        white-space: nowrap !important;
     }
 
-    /* Filtros comprimidos columna derecha */
-    .filter-section { font-size: 11px !important; margin-top: 15px; }
-    .stMultiSelect div { min-height: 28px !important; }
-    .stMultiSelect span { font-size: 10px !important; }
-    div[data-baseweb="select"] { font-size: 11px !important; }
+    /* Reducir tamaño de texto en filtros */
+    .stMultiSelect label { font-size: 12px !important; font-weight: bold !important; color: #001f3f;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- CARGA DE DATOS ---
+# --- HEADER VISUAL ---
+st.markdown('<div class="app-header"><p class="app-title">GENERADOR MAPAS EM</p><p style="font-size:12px; opacity:0.8; margin:0;">Market Study Intelligence</p></div>', unsafe_allow_html=True)
+
+# --- LÓGICA DE DATOS ---
 @st.cache_data
 def load_data(file):
     try:
@@ -66,101 +70,124 @@ def load_data(file):
             'tier': 'TIER', 'zona': 'ZONA', 'ciudad': next((x for x in df.columns if 'CIUDAD' in x), None),
             'planta': 'PLANTA', 'dorm': 'Nº DORM'
         }
-        coords = df[c['coord']].astype(str).str.replace(' ', '').str.split(',', expand=True)
-        df['lat'] = pd.to_numeric(coords[0], errors='coerce')
-        df['lon'] = pd.to_numeric(coords[1], errors='coerce')
-        return df.dropna(subset=['lat', 'lon']), c
-    except: return pd.DataFrame(), {}
+        if c['coord']:
+            coords = df[c['coord']].astype(str).str.replace(' ', '').str.split(',', expand=True)
+            df['lat'] = pd.to_numeric(coords[0], errors='coerce')
+            df['lon'] = pd.to_numeric(coords[1], errors='coerce')
+            return df.dropna(subset=['lat', 'lon']), c
+        return pd.DataFrame(), {}
+    except Exception as e: 
+        st.error(f"Error al procesar: {e}")
+        return pd.DataFrame(), {}
 
-# --- ESTRUCTURA DE 4 COLUMNAS ---
-c_izq, c_mapa, c_der, c_filtros = st.columns([1, 3.2, 1, 0.9])
+# --- LAYOUT DE 4 COLUMNAS ---
+# Espaciado superior mínimo para separar del header
+st.write("") 
+col_izq, col_mapa, col_der, col_ctrl = st.columns([1, 3.5, 1, 1])
 
-# Inicialización de variables
-df_f = pd.DataFrame()
-map_center = [41.6, 1.8] # Centro Cataluña
-map_zoom = 8
+# Variables base (Centro en Cataluña)
+df_final = pd.DataFrame()
+m_lat, m_lon, m_zoom = 41.6, 1.8, 8 
+ALTURA_CONTENEDOR = 800 # Altura fija para que funcione en pantallas estándar
 
-# COLUMNA 4: CARGA Y FILTROS (DERECHA)
-with c_filtros:
-    st.markdown('<div class="column-scroll">', unsafe_allow_html=True)
-    archivo = st.file_uploader("📂 CARGAR EXCEL", type=['xlsx'], label_visibility="visible")
+# COLUMNA DERECHA (Panel de Control y Filtros)
+with col_ctrl:
+    with st.container(height=ALTURA_CONTENEDOR, border=False):
+        st.markdown("##### 📂 ARCHIVO")
+        file = st.file_uploader("Subir Excel", type=['xlsx'], label_visibility="collapsed")
+        
+        if file:
+            df_raw, cols = load_data(file)
+            if not df_raw.empty:
+                st.markdown("---")
+                st.markdown("##### 🔍 FILTROS")
+                
+                # Función auxiliar para filtros
+                def mk_filter(lbl, col_name):
+                    if col_name and col_name in df_raw.columns:
+                        opts = sorted(df_raw[col_name].dropna().unique().astype(str))
+                        return st.multiselect(lbl, opts, default=opts)
+                    return []
+                
+                # Despliegue de TODOS los filtros solicitados
+                f_tipo = mk_filter("Tipología", cols['tipo'])
+                f_tier = mk_filter("Tier", cols['tier'])
+                f_zona = mk_filter("Zona", cols['zona'])
+                f_ciudad = mk_filter("Ciudad", cols['ciudad'])
+                f_planta = mk_filter("Planta", cols['planta'])
+                f_dorm = mk_filter("Dormitorios", cols['dorm'])
+
+                # Aplicar máscara combinada
+                mask = pd.Series(True, index=df_raw.index)
+                if cols['tipo']: mask &= df_raw[cols['tipo']].astype(str).isin(f_tipo)
+                if cols['tier']: mask &= df_raw[cols['tier']].astype(str).isin(f_tier)
+                if cols['zona']: mask &= df_raw[cols['zona']].astype(str).isin(f_zona)
+                if cols['ciudad']: mask &= df_raw[cols['ciudad']].astype(str).isin(f_ciudad)
+                if cols['planta']: mask &= df_raw[cols['planta']].astype(str).isin(f_planta)
+                if cols['dorm']: mask &= df_raw[cols['dorm']].astype(str).isin(f_dorm)
+                
+                df_final = df_raw[mask]
+                
+                if not df_final.empty:
+                    # Agrupamos por promoción
+                    agg_rules = {
+                        'lat':'first', 'lon':'first', 
+                        cols['vrm']:'median' if cols['vrm'] in df_final.columns else 'first',
+                        cols['pvp']:'mean' if cols['pvp'] in df_final.columns else 'first', 
+                        cols['ref']:'count'
+                    }
+                    if cols['dorm']: agg_rules[cols['dorm']] = lambda x: "-".join(sorted(x.unique().astype(str)))
+                    
+                    df_promo = df_final.groupby(cols['ref']).agg(agg_rules).rename(columns={cols['ref']: 'UDS'}).reset_index()
+                    m_lat, m_lon, m_zoom = df_promo['lat'].mean(), df_promo['lon'].mean(), 13
+
+# FUNCION PARA PINTAR TARJETAS
+def render_promo_cards(data, start_idx):
+    for i, row in data.iterrows():
+        st.markdown(f"""
+        <div class="promo-card">
+            <div class="promo-header"><div class="promo-circle">{start_idx+i+1}</div><p class="promo-name">{row[cols['ref']]}</p></div>
+            <div class="promo-details">
+                <b>Uds:</b> {row['UDS']} | <b>PVP m:</b> {row.get(cols['pvp'], 0):,.0f}€<br>
+                <b>Unit:</b> {row.get(cols['vrm'], 0):,.0f} €/m² | <b>Tip:</b> {row.get(cols['dorm'], 'N/A')}D
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+# COLUMNAS DE TARJETAS (Izq y Der)
+with col_izq:
+    with st.container(height=ALTURA_CONTENEDOR, border=False):
+        if not df_final.empty:
+            mid = len(df_promo) // 2
+            render_promo_cards(df_promo.iloc[:mid], 0)
+
+with col_der:
+    with st.container(height=ALTURA_CONTENEDOR, border=False):
+        if not df_final.empty:
+            render_promo_cards(df_promo.iloc[mid:], mid)
+
+# COLUMNA CENTRAL (MAPA)
+with col_mapa:
+    m = folium.Map(location=[m_lat, m_lon], zoom_start=m_zoom, tiles=None, control_scale=True)
     
-    if archivo:
-        df_raw, cols = load_data(archivo)
-        if not df_raw.empty:
-            st.markdown('<p class="filter-section"><b>FILTROS DE BÚSQUEDA</b></p>', unsafe_allow_html=True)
-            def simple_filter(label, col):
-                return st.multiselect(label, sorted(df_raw[col].dropna().unique().astype(str)), 
-                                    default=sorted(df_raw[col].dropna().unique().astype(str)))
-            
-            f_tipo = simple_filter("Tipología", cols['tipo'])
-            f_tier = simple_filter("Tier", cols['tier'])
-            f_ciudad = simple_filter("Ciudad", cols['ciudad'])
-            f_zona = simple_filter("Zona", cols['zona'])
-            f_dorm = simple_filter("Dormitorios", cols['dorm'])
-
-            # Lógica de filtrado
-            mask = (df_raw[cols['tipo']].astype(str).isin(f_tipo)) & \
-                   (df_raw[cols['tier']].astype(str).isin(f_tier)) & \
-                   (df_raw[cols['ciudad']].astype(str).isin(f_ciudad)) & \
-                   (df_raw[cols['zona']].astype(str).isin(f_zona)) & \
-                   (df_raw[cols['dorm']].astype(str).isin(f_dorm))
-            df_f = df_raw[mask]
-
-            if not df_f.empty:
-                df_promo = df_f.groupby(cols['ref']).agg({
-                    'lat':'first', 'lon':'first', cols['vrm']:'median', cols['pvp']:'mean', 
-                    cols['ref']:'count', cols['dorm']: lambda x: "-".join(sorted(x.unique().astype(str)))
-                }).rename(columns={cols['ref']: 'UNIDADES'}).reset_index()
-                map_center = [df_promo['lat'].mean(), df_promo['lon'].mean()]
-                map_zoom = 13
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# COLUMNAS 1 Y 3: CUADROS PERIMETRALES
-if archivo and not df_f.empty:
-    split = len(df_promo) // 2
-    def draw_cards(subset, start):
-        for i, row in subset.iterrows():
-            st.markdown(f"""
-            <div class="promo-card">
-                <div class="promo-header"><div class="promo-number">{start+i+1}</div><p class="promo-title">{row[cols['ref']]}</p></div>
-                <div class="promo-info">
-                    <b>Uds:</b> {row['UNIDADES']} | <b>PVP m:</b> {row[cols['pvp']]:,.0f}€<br>
-                    <b>Unit:</b> {row[cols['vrm']]:,.0f} €/m² | <b>Tip:</b> {row[cols['dorm']]}D
-                </div>
-            </div>""", unsafe_allow_html=True)
-
-    with c_izq:
-        st.markdown('<div class="column-scroll">', unsafe_allow_html=True)
-        draw_cards(df_promo.iloc[:split], 0)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with c_der:
-        st.markdown('<div class="column-scroll">', unsafe_allow_html=True)
-        draw_cards(df_promo.iloc[split:], split)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# COLUMNA 2: EL MAPA (SIEMPRE VISIBLE)
-with c_mapa:
-    m = folium.Map(location=map_center, zoom_start=map_zoom, tiles=None, control_scale=True)
-    
-    # Capas de Google (lyrs=m es el callejero más limpio)
+    # Capas (Satélite e Híbrido profesional)
     folium.TileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", attr="Google", name="Satélite Híbrido").add_to(m)
     folium.TileLayer("https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", attr="Google", name="Callejero Profesional").add_to(m)
 
-    if archivo and not df_f.empty:
+    if not df_final.empty:
         sw, ne = df_promo[['lat', 'lon']].min().values.tolist(), df_promo[['lat', 'lon']].max().values.tolist()
         m.fit_bounds([sw, ne])
         
         for i, row in df_promo.iterrows():
-            # El puntero/número azul
+            # Círculo Azul numerado
             folium.Marker([row['lat'], row['lon']], 
-                icon=folium.DivIcon(html=f'<div class="promo-number" style="width:22px; height:22px;">{i+1}</div>')
+                icon=folium.DivIcon(html=f'<div class="promo-circle" style="width:24px; height:24px;">{i+1}</div>')
             ).add_to(m)
-            # La etiqueta con fondo blanco y borde
+            # Etiqueta de precio
+            val_vrm = row.get(cols['vrm'], 0)
             folium.Marker([row['lat'], row['lon']], 
-                icon=folium.DivIcon(html=f'<div class="map-label">{row[cols['vrm']]:,.0f} €/m²</div>', icon_anchor=(-15, 12))
+                icon=folium.DivIcon(html=f'<div class="map-label">{val_vrm:,.0f} €/m²</div>', icon_anchor=(-15, 12))
             ).add_to(m)
 
     folium.LayerControl(position='topright').add_to(m)
-    st_folium(m, width="100%", height=950, key="main_map")
+    # Altura del mapa ajustada a la de los contenedores
+    st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map")
