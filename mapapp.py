@@ -21,6 +21,8 @@ if 'hidden_promos' not in st.session_state:
     st.session_state.hidden_promos = set()
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
+if 'do_filter_view' not in st.session_state:
+    st.session_state.do_filter_view = False
 
 # --- ESTILOS CSS TEMA OSCURO ---
 st.markdown("""
@@ -30,8 +32,8 @@ header[data-testid="stHeader"] { display: none !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
 p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin-bottom: 2px !important;}
 
-/* Forzar reducción de espacios nativos de Streamlit para controlar nosotros la separación */
-[data-testid="stVerticalBlock"] { gap: 0rem !important; }
+/* Separación compacta pero ESTABLE para que no se solapen jamás */
+[data-testid="stVerticalBlock"] { gap: 0.3rem !important; }
 
 /* Header */
 .app-header {
@@ -41,7 +43,7 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 18px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas (Sin margen inferior CSS, el margen se lo damos por Python para que sea inquebrantable) */
+/* Tarjetas base: Min-height estable y sin márgenes forzados */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
     padding: 8px 10px; transition: all 0.2s;
@@ -77,13 +79,13 @@ div.stButton > button {
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 
-/* Botón X AÚN MÁS MINÚSCULO (12px) */
-.btn-micro { display: flex; justify-content: center; align-items: center; height: 100%; width: 100%; padding-top: 15px; }
+/* Botón X Microscópico y centrado */
+.btn-micro { display: flex; justify-content: center; align-items: center; height: 100%; width: 100%; }
 .btn-micro > div > button { 
-    height: 12px !important; width: 12px !important; min-height: 12px !important; 
-    font-size: 7px !important; border: 1px solid #444444 !important; border-radius: 50% !important; 
-    padding: 0 !important; color: #666666 !important; background: #1e1e1e !important; 
-    display: flex; align-items: center; justify-content: center;
+    height: 16px !important; width: 16px !important; min-height: 16px !important; 
+    font-size: 8px !important; border: 1px solid #444444 !important; border-radius: 50% !important; 
+    padding: 0 !important; color: #777777 !important; background: transparent !important; 
+    display: flex; align-items: center; justify-content: center; margin: auto !important;
 }
 .btn-micro > div > button:hover { color: #ff4d4d !important; border-color: #ff4d4d !important; background-color: rgba(255,77,77,0.1) !important;}
 </style>
@@ -137,6 +139,7 @@ def generate_zip_images(df, cols):
             ref = str(row[cols['ref']])
             nombre = str(row.get(cols['nombre'], ref))
             if nombre.lower() in ['nan', 'none', '']: nombre = ref
+            
             uds = row['UDS']
             pvp = row.get(cols['pvp'], 0)
             vrm = row.get(cols['vrm'], 0)
@@ -144,6 +147,7 @@ def generate_zip_images(df, cols):
             
             fig, ax = plt.subplots(figsize=(5.6, 1.8), dpi=200)
             ax.axis('off')
+            
             ax.add_patch(plt.Rectangle((0, 0), 1, 1, facecolor='#ffffff', edgecolor='#cccccc', linewidth=2, transform=ax.transAxes))
             ax.add_patch(plt.Rectangle((0, 0), 0.02, 1, facecolor='#3a86ff', transform=ax.transAxes))
             
@@ -161,12 +165,13 @@ def generate_zip_images(df, cols):
             plt.savefig(img_buf, format='png', bbox_inches='tight', pad_inches=0.02)
             plt.close(fig)
             img_buf.seek(0)
+            
             zip_file.writestr(f"Ficha_{ref}.png", img_buf.read())
             
     zip_buffer.seek(0)
     return zip_buffer
 
-# --- FUNCIÓN GENERADORA DE ETIQUETAS INTELIGENTES ---
+# --- FUNCIÓN GENERADORA DE ETIQUETAS INTERACTIVAS (JS NATIVO) ---
 def build_smart_marker_html(ref_str, val_vrm, direction, show_price):
     if not show_price:
         return f"""
@@ -179,15 +184,34 @@ def build_smart_marker_html(ref_str, val_vrm, direction, show_price):
         </div>
         """
         
-    # Lógica de posicionamiento absoluto para mantener el "ancla" siempre en la píldora
-    align_prop = "left" if direction == "right" else "right"
-    pad_prop = "1px 6px 1px 12px" if direction == "right" else "1px 12px 1px 6px"
+    # Inicialización basada en el algoritmo Python
+    if direction == "right":
+        align_style = "left: 15px;"
+        pad_style = "1px 6px 1px 12px"
+    else:
+        align_style = "right: 15px;"
+        pad_style = "1px 12px 1px 6px"
+    
+    # ¡LA MAGIA JAVASCRIPT! Permite hacer click para cambiar el lado al vuelo
+    js_code = """
+    var p = this.querySelector('.tag-price');
+    if (p.style.left) {
+        p.style.left = '';
+        p.style.right = '15px';
+        p.style.padding = '1px 12px 1px 6px';
+    } else {
+        p.style.right = '';
+        p.style.left = '15px';
+        p.style.padding = '1px 6px 1px 12px';
+    }
+    event.stopPropagation();
+    """
     
     return f"""
-    <div style="position: relative; width: 26px; height: 20px; font-family: Arial, sans-serif;">
-        <div style="position: absolute; {align_prop}: 15px; top: 0px; background-color: white; 
-                    border: 1.5px solid #3a86ff; border-radius: 4px; padding: {pad_prop}; 
-                    font-size: 10px; font-weight: bold; color: #121212; white-space: nowrap; z-index: 1;">
+    <div style="position: relative; width: 26px; height: 20px; font-family: Arial, sans-serif; cursor: pointer;" onclick="{js_code}">
+        <div class="tag-price" style="position: absolute; {align_style} top: 0px; background-color: white; 
+                    border: 1.5px solid #3a86ff; border-radius: 4px; padding: {pad_style}; 
+                    font-size: 10px; font-weight: bold; color: #121212; white-space: nowrap; z-index: 1; transition: all 0.25s ease;">
             {val_vrm:,.0f} €/m²
         </div>
         <div style="position: absolute; left: 0; top: 0; background-color: #3a86ff; color: white; border-radius: 12px;
@@ -333,6 +357,7 @@ if file and not df_filtered.empty:
             </div>
         </div>"""
 
+        # Columnas aseguradas con alineación vertical perfecta nativa de Streamlit
         if side == "left":
             c_btn, c_card = st.columns([0.10, 0.90], vertical_alignment="center")
             with c_btn:
@@ -353,9 +378,6 @@ if file and not df_filtered.empty:
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Espaciador inquebrantable controlado por Python
-        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     TOTAL_CARDS = len(df_visible)
     MAX_LEFT_CAPACITY = 10
@@ -376,7 +398,7 @@ if file and not df_filtered.empty:
             st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
             for _, row in right_df.iterrows(): render_promo_card(row, "right")
 
-    # MAPA NATIVO Y FLUIDO CON SISTEMA ANTI-COLISIÓN DE ETIQUETAS
+    # MAPA NATIVO (100% FLUIDO Y ESTABLE)
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
@@ -402,9 +424,9 @@ if file and not df_filtered.empty:
             sw, ne = df_visible[['lat', 'lon']].min().values.tolist(), df_visible[['lat', 'lon']].max().values.tolist()
             m.fit_bounds([sw, ne])
             
-            # --- ALGORITMO DE ANTI-SOLAPAMIENTO (JITTER & FLIP) ---
+            # Algoritmo Base de separación (pre-asigna derecha/izquierda inicial)
             processed_markers = []
-            CLUSTER_THRESHOLD = 0.0025 # Distancia en grados para considerar que están "pegados" (~250m)
+            CLUSTER_THRESHOLD = 0.0025 
             
             for i, row in df_visible.iterrows():
                 ref_str = str(row[cols['ref']])
@@ -412,14 +434,12 @@ if file and not df_filtered.empty:
                 current_lat = row['lat']
                 current_lon = row['lon']
                 
-                direction = "right" # Por defecto miran hacia la derecha
+                direction = "right" 
                 lat_offset = 0
                 lon_offset = 0
                 
-                # Buscar vecinos cercanos ya procesados
                 neighbors = []
                 for p in processed_markers:
-                    # Distancia Euclidiana simple
                     dist = ((current_lat - p['lat'])**2 + (current_lon - p['lon'])**2)**0.5
                     if dist < CLUSTER_THRESHOLD:
                         neighbors.append(p)
@@ -427,27 +447,25 @@ if file and not df_filtered.empty:
                 if neighbors:
                     dirs_taken = [n['dir'] for n in neighbors]
                     if "right" in dirs_taken and "left" not in dirs_taken:
-                        direction = "left" # Hacemos "Flip" a la izquierda
+                        direction = "left" 
                     elif "right" in dirs_taken and "left" in dirs_taken:
-                        # Si hay 3 o más en el mismo sitio exacto, aplicamos un micro-desplazamiento en abanico
                         direction = "right" if len(neighbors) % 2 == 0 else "left"
-                        lat_offset = 0.0004 * len(neighbors) # Desplaza ~40 metros al norte
-                        lon_offset = 0.0004 * len(neighbors) # Desplaza ~40 metros al este
+                        lat_offset = 0.0004 * len(neighbors) 
+                        lon_offset = 0.0004 * len(neighbors) 
                 
                 final_lat = current_lat + lat_offset
                 final_lon = current_lon + lon_offset
-                
                 processed_markers.append({'lat': final_lat, 'lon': final_lon, 'dir': direction})
                 
-                # Construimos el marcador inteligente
+                # Construimos el marcador mágico interactivo
                 marker_html = build_smart_marker_html(ref_str, val_vrm, direction, mostrar_etiquetas)
                 
                 folium.Marker(
                     [final_lat, final_lon], 
-                    icon=folium.DivIcon(html=marker_html, icon_anchor=(13, 10)) # El ancla siempre es el centro de la píldora
+                    icon=folium.DivIcon(html=marker_html, icon_anchor=(13, 10)) 
                 ).add_to(m)
 
-        # PARA EVITAR EL PARPADEO GRIS: Prohibimos al mapa mandar datos a Python en cada pixel que se mueve.
+        # PARÁMETRO VITAL: Prohíbe la recarga del mapa al mover el ratón.
         st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map", returned_objects=[])
 
 else:
