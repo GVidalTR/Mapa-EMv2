@@ -5,150 +5,174 @@ from streamlit_folium import st_folium
 import googlemaps
 from folium.plugins import Fullscreen
 
-# --- CONFIGURACIÓN ---
-st.set_page_config(page_title="PropTech Analytics Pro", layout="wide")
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="PropTech Analytics Pro", layout="wide", initial_sidebar_state="expanded")
+
+# CSS para reducir márgenes superiores y dar estilo a las tarjetas
+st.markdown("""
+    <style>
+    .block-container { padding-top: 1rem; padding-bottom: 0rem; }
+    .side-scroll { height: 700px; overflow-y: auto; padding-right: 10px; }
+    .promo-card {
+        background-color: #e3f2fd;
+        border: 1px solid #bbdefb;
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 10px;
+        font-family: sans-serif;
+    }
+    .promo-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .promo-number {
+        background-color: #0d47a1; color: white; border-radius: 50%;
+        width: 24px; height: 24px; display: flex; justify-content: center;
+        align-items: center; font-size: 12px; font-weight: bold;
+    }
+    .promo-title { font-weight: bold; color: #1a237e; font-size: 14px; margin: 0; }
+    .promo-info { font-size: 12px; line-height: 1.4; color: #333; }
+    .promo-label-map {
+        background: white; border: 1.5px solid #0d47a1; border-radius: 4px;
+        padding: 2px 6px; font-size: 11px; font-weight: bold; color: #0d47a1;
+        white-space: nowrap; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Carga de API Key
 try:
     API_KEY = st.secrets["GOOGLE_MAPS_API_KEY"]
     gmaps = googlemaps.Client(key=API_KEY)
 except:
-    st.error("⚠️ Configura 'GOOGLE_MAPS_API_KEY' en los Secrets de Streamlit.")
+    st.error("⚠️ Configura 'GOOGLE_MAPS_API_KEY' en Secrets.")
     st.stop()
 
-# --- FUNCIONES DE PROCESAMIENTO ---
 @st.cache_data
-def procesar_excel(file):
+def load_data(file):
     try:
         xls = pd.ExcelFile(file)
-        if 'EEMM' not in xls.sheet_names:
-            st.error("❌ No se encontró la pestaña 'EEMM'.")
-            return pd.DataFrame(), {}
-        
         df = pd.read_excel(xls, sheet_name='EEMM')
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # Columnas clave
-        col_coord = next((c for c in df.columns if 'COORD' in c), None)
-        col_ref = next((c for c in df.columns if any(k in c for k in ['REF', 'PROMOCION', 'NOMBRE'])), None)
-        col_vrm = 'VRM SCIC' if 'VRM SCIC' in df.columns else None
-        col_muni = next((c for c in df.columns if 'CIUDAD' in c or 'MUNICIPIO' in c), None)
-        col_pvp = next((c for c in df.columns if 'PVP' in c), None)
+        # Mapeo de columnas necesarias
+        cols = {
+            'coord': next((c for c in df.columns if 'COORD' in c), None),
+            'ref': next((c for c in df.columns if any(k in c for k in ['REF', 'PROMOCION', 'NOMBRE'])), None),
+            'vrm': 'VRM SCIC',
+            'pvp': 'PVP',
+            'tipo': next((c for c in df.columns if 'TIPOLOGI' in c), None),
+            'tier': 'TIER',
+            'zona': 'ZONA',
+            'ciudad': next((c for c in df.columns if any(k in c for k in ['CIUDAD', 'MUNICIPIO'])), None),
+            'planta': 'PLANTA',
+            'dorm': 'Nº DORM'
+        }
 
-        if col_coord:
-            coords = df[col_coord].astype(str).str.replace(' ', '').str.split(',', expand=True)
+        if cols['coord']:
+            coords = df[cols['coord']].astype(str).str.replace(' ', '').str.split(',', expand=True)
             df['lat'] = pd.to_numeric(coords[0], errors='coerce')
             df['lon'] = pd.to_numeric(coords[1], errors='coerce')
             df = df.dropna(subset=['lat', 'lon'])
-            
-        return df, {'ref': col_ref, 'vrm': col_vrm, 'muni': col_muni, 'pvp': col_pvp}
+        return df, cols
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error al cargar el archivo: {e}")
         return pd.DataFrame(), {}
 
-# --- INTERFAZ ---
-st.title("🏗️ Market Study: Análisis de Entorno")
-
-with st.sidebar:
-    st.header("📂 Gestión")
-    archivo = st.file_uploader("Subir Excel", type=['xlsx'])
-    show_boxes = st.toggle("Mostrar Cuadros de Datos", value=True)
-    st.divider()
-    st.header("🔍 Filtros")
+# --- LÓGICA DE APP ---
+archivo = st.sidebar.file_uploader("Subir Excel", type=['xlsx'])
 
 if archivo:
-    df_raw, cols = procesar_excel(archivo)
+    df_raw, c_map = load_data(archivo)
     
     if not df_raw.empty:
-        # --- FILTROS DINÁMICOS EN SIDEBAR ---
-        with st.sidebar:
-            if cols['muni']:
-                muni_opts = sorted(df_raw[cols['muni']].unique().astype(str))
-                sel_muni = st.multiselect("Municipios", muni_opts, default=muni_opts)
-                df_filtered = df_raw[df_raw[cols['muni']].astype(str).isin(sel_muni)]
-            else:
-                df_filtered = df_raw.copy()
+        # --- SIDEBAR: FILTROS ---
+        st.sidebar.header("🔍 Filtros")
+        show_boxes = st.sidebar.toggle("Mostrar Cuadros de Datos", value=True)
+        
+        def get_opts(col): return sorted(df_raw[col].dropna().unique().astype(str)) if col in df_raw.columns else []
 
-        # Agrupamos por promoción para obtener la mediana del precio unitario (VRM SCIC)
-        # Esto colapsa las múltiples unidades de una promoción en un solo punto en el mapa
-        df_promo = df_filtered.groupby(cols['ref']).agg({
-            'lat': 'first',
-            'lon': 'first',
-            cols['vrm']: 'median' if cols['vrm'] else 'mean',
-            cols['pvp']: 'mean'
-        }).reset_index()
+        f_tipo = st.sidebar.multiselect("Tipología", get_opts(c_map['tipo']), default=get_opts(c_map['tipo']))
+        f_tier = st.sidebar.multiselect("Tier", get_opts(c_map['tier']), default=get_opts(c_map['tier']))
+        f_ciudad = st.sidebar.multiselect("Ciudad", get_opts(c_map['ciudad']), default=get_opts(c_map['ciudad']))
+        f_zona = st.sidebar.multiselect("Zona", get_opts(c_map['zona']), default=get_opts(c_map['zona']))
+        f_dorm = st.sidebar.multiselect("Dormitorios", get_opts(c_map['dorm']), default=get_opts(c_map['dorm']))
 
-        # --- DISTRIBUCIÓN DE CUADROS (Izquierda, Centro/Mapa, Derecha) ---
-        n_promos = len(df_promo)
-        # Dividimos las promociones en 3 grupos para repartirlas
-        p_izq = df_promo.iloc[:n_promos//3]
-        p_der = df_promo.iloc[n_promos//3 : 2*n_promos//3]
-        p_inf = df_promo.iloc[2*n_promos//3:]
+        # Aplicar Filtros
+        df_f = df_raw.copy()
+        if c_map['tipo']: df_f = df_f[df_f[c_map['tipo']].astype(str).isin(f_tipo)]
+        if c_map['tier']: df_f = df_f[df_f[c_map['tier']].astype(str).isin(f_tier)]
+        if c_map['ciudad']: df_f = df_f[df_f[c_map['ciudad']].astype(str).isin(f_ciudad)]
+        if c_map['zona']: df_f = df_f[df_f[c_map['zona']].astype(str).isin(f_zona)]
+        if c_map['dorm']: df_f = df_f[df_f[c_map['dorm']].astype(str).isin(f_dorm)]
 
-        c_izq, c_mapa, c_der = st.columns([1, 3, 1])
+        # Agrupación por Promoción para el Resumen
+        agg_dict = {
+            'lat': 'first', 'lon': 'first',
+            c_map['vrm']: 'median',
+            c_map['pvp']: 'mean',
+            c_map['ref']: 'count' # Para contar unidades
+        }
+        if c_map['dorm']: agg_dict[c_map['dorm']] = lambda x: "-".join(sorted(x.unique().astype(str)))
+        
+        df_promo = df_f.groupby(c_map['ref']).agg(agg_dict).rename(columns={c_map['ref']: 'UNIDADES'}).reset_index()
 
-        # Función para dibujar cuadro
-        def draw_card(row, idx):
-            st.markdown(f"""
-            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 10px; background: white; border-left: 5px solid #001f3f;">
-                <h6 style="margin:0; color:#001f3f;">#{idx} {row[cols['ref']]}</h6>
-                <p style="margin:0; font-size: 12px;"><b>VRM:</b> {row[cols['vrm']]:,.0f} €/m²</p>
-                <p style="margin:0; font-size: 11px; color: gray;">Ref: {row[cols['ref']]}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        # --- LAYOUT ---
+        st.subheader("Market Study: Análisis de Entorno")
+        col_izq, col_mapa, col_der = st.columns([1, 2.5, 1])
 
-        # Columna Izquierda
-        with c_izq:
+        def render_cards(subset, start_idx):
+            for i, row in subset.iterrows():
+                num = start_idx + i + 1
+                st.markdown(f"""
+                <div class="promo-card">
+                    <div class="promo-header">
+                        <div class="promo-number">{num}</div>
+                        <p class="promo-title">{row[c_map['ref']]}</p>
+                    </div>
+                    <div class="promo-info">
+                        <b>Unidades:</b> {row['UNIDADES']}<br>
+                        <b>PVP medio:</b> {row[c_map['pvp']]:,.0f} €<br>
+                        <b>Precio unit.:</b> {row[c_map['vrm']]:,.0f} €/m²<br>
+                        <b>Tipologías:</b> {row.get(c_map['dorm'], 'N/A')}D
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Distribución de datos
+        split = len(df_promo) // 2
+        
+        with col_izq:
             if show_boxes:
-                for i, row in p_izq.iterrows(): draw_card(row, i+1)
+                st.markdown('<div class="side-scroll">', unsafe_allow_html=True)
+                render_cards(df_promo.iloc[:split], 0)
+                st.markdown('</div>', unsafe_allow_html=True)
 
-        # Columna Central (MAPA)
-        with c_mapa:
+        with col_mapa:
             m = folium.Map(tiles=None)
-            
-            # --- AJUSTE AUTOMÁTICO DE ZOOM (fit_bounds) ---
+            # Encuadre automático (fit_bounds)
             sw = df_promo[['lat', 'lon']].min().values.tolist()
             ne = df_promo[['lat', 'lon']].max().values.tolist()
-            m.fit_bounds([sw, ne]) # Esto encuadra el zoom al 100% de los puntos
+            m.fit_bounds([sw, ne])
 
-            folium.TileLayer(
-                tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-                attr="Google Hybrid", name="Google Satélite"
-            ).add_to(m)
+            folium.TileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+                             attr="Google Hybrid", name="Google Satélite").add_to(m)
 
             for i, row in df_promo.iterrows():
-                # Etiqueta con el precio unitario (VRM SCIC)
-                vrm_label = f"{row[cols['vrm']]:,.0f}€" if pd.notnull(row[cols['vrm']]) else "N/A"
-                
-                # Marcador numérico
-                folium.Marker(
-                    [row['lat'], row['lon']],
-                    icon=folium.DivIcon(html=f"""
-                        <div style="background:#001f3f; color:white; border-radius:50%; width:22px; height:22px; 
-                        display:flex; justify-content:center; align-items:center; font-size:10px; border:1px solid white;">
-                        {i+1}</div>""")
-                ).add_to(m)
-
                 # Etiqueta de Precio Unitario (VRM)
-                folium.Marker(
-                    [row['lat'], row['lon']],
-                    icon=folium.DivIcon(
-                        html=f'<div style="background:rgba(255,255,255,0.8); padding:2px 5px; border-radius:3px; font-size:10px; font-weight:bold; color:#001f3f; white-space:nowrap; border:1px solid #001f3f;">{vrm_label}</div>',
-                        icon_anchor=(-15, 10)
-                    )
+                vrm_txt = f"{row[c_map['vrm']]:,.0f} €/m²"
+                
+                # Número azul
+                folium.Marker([row['lat'], row['lon']],
+                    icon=folium.DivIcon(html=f'<div class="promo-number" style="width:20px; height:20px; font-size:10px;">{i+1}</div>')
+                ).add_to(m)
+                
+                # Recuadro blanco con precio (ahora con ancho dinámico corregido)
+                folium.Marker([row['lat'], row['lon']],
+                    icon=folium.DivIcon(html=f'<div class="promo-label-map">{vrm_txt}</div>', icon_anchor=(-12, 12))
                 ).add_to(m)
 
-            st_folium(m, width="100%", height=650, key="mapa_v4")
+            st_folium(m, width="100%", height=700, key="mapa_final")
 
-        # Columna Derecha
-        with c_der:
+        with col_der:
             if show_boxes:
-                for i, row in p_der.iterrows(): draw_card(row, i+1)
-
-        # Fila Inferior
-        if show_boxes and not p_inf.empty:
-            st.divider()
-            cols_inf = st.columns(4) # Repartimos las restantes en 4 minicolumnas
-            for i, (_, row) in enumerate(p_inf.iterrows()):
-                with cols_inf[i % 4]:
-                    draw_card(row, len(p_izq) + len(p_der) + i + 1)
+                st.markdown('<div class="side-scroll">', unsafe_allow_html=True)
+                render_cards(df_promo.iloc[split:], split)
+                st.markdown('</div>', unsafe_allow_html=True)
