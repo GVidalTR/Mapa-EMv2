@@ -5,7 +5,7 @@ from streamlit_folium import st_folium
 import io
 import zipfile
 import matplotlib
-matplotlib.use('Agg') # Evita que matplotlib intente abrir ventanas visuales
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # --- CONFIGURACION DE PAGINA Y MEMORIA ---
@@ -34,11 +34,11 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 16px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas (Sin margen inferior para que el Python controle el espaciado) */
+/* Tarjetas base (El espaciado lo controla Python dinamicamente) */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
     padding: 8px 10px; margin-bottom: 0px !important; transition: all 0.2s;
-    min-height: 70px; display: flex; flex-direction: column; justify-content: center; position: relative;
+    min-height: 72px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
 .promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 15px;}
@@ -54,16 +54,17 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 .promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.3 !important; }
 .promo-details b { color: #ffffff !important; }
 
-/* Filtros y Selectores Reducidos al Minimo */
+/* Filtros y Selectores Minimizados al Extremo */
 div[data-baseweb="select"] > div { 
     background-color: #252525 !important; border-color: #3a3a3a !important; 
-    min-height: 22px !important; height: 24px !important; padding: 0px 4px !important; 
+    min-height: 24px !important; height: 24px !important; 
+    padding-top: 0px !important; padding-bottom: 0px !important; 
 }
 div[data-baseweb="select"] span { font-size: 10px !important; }
 span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 9px !important; padding: 2px 4px !important; height: 16px !important; margin: 1px !important;}
 .stMultiSelect label { font-size: 10px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 0px !important;}
 
-/* Botones Nativos */
+/* Botones Nativos Streamlit */
 div.stButton > button {
     padding: 2px 4px !important; font-size: 10px !important; min-height: 24px !important;
     background-color: transparent; border: 1px solid #3a3a3a; color: #a0a0a0; border-radius: 4px; display: flex; margin: auto;
@@ -116,7 +117,7 @@ def clean_dorm(x):
             items.add(s)
     return "-".join(sorted(list(items)))
 
-# Generador de Imagenes ZIP (Dibuja fichas blancas para PPT)
+# Generador de Imagenes ZIP a Medida
 def generate_zip_images(df, cols):
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -130,37 +131,34 @@ def generate_zip_images(df, cols):
             vrm = row.get(cols['vrm'], 0)
             tipos = row.get(cols['dorm'], 'N/A')
             
-            # Dibujar la tarjeta con matplotlib
-            fig, ax = plt.subplots(figsize=(6, 2.2), dpi=200)
+            # Lienzo ajustado para que quepa todo sin pisarse
+            fig, ax = plt.subplots(figsize=(5.6, 1.8), dpi=200)
             ax.axis('off')
             
-            # Fondo blanco y borde azul
-            ax.add_patch(plt.Rectangle((0, 0), 1, 1, facecolor='#ffffff', edgecolor='#d1d1d1', linewidth=2, transform=ax.transAxes))
-            ax.add_patch(plt.Rectangle((0, 0), 0.03, 1, facecolor='#3a86ff', transform=ax.transAxes))
+            # Fondo blanco y borde
+            ax.add_patch(plt.Rectangle((0, 0), 1, 1, facecolor='#ffffff', edgecolor='#cccccc', linewidth=2, transform=ax.transAxes))
+            ax.add_patch(plt.Rectangle((0, 0), 0.02, 1, facecolor='#3a86ff', transform=ax.transAxes))
             
-            # Textos (Conceptos grandes, valores normales)
-            ax.text(0.06, 0.72, f"{ref} - {nombre}", fontsize=14, fontweight='heavy', color='#003366', transform=ax.transAxes)
+            # Textos re-distribuidos
+            ax.text(0.05, 0.72, f"{ref} - {nombre}", fontsize=14, fontweight='heavy', color='#003366', transform=ax.transAxes)
             
-            # Fila 1
-            ax.text(0.06, 0.40, "Unidades:", fontsize=12, fontweight='bold', color='#555555', transform=ax.transAxes)
-            ax.text(0.26, 0.40, f"{uds}", fontsize=11, color='#121212', transform=ax.transAxes)
+            ax.text(0.05, 0.40, "Unidades:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
+            ax.text(0.25, 0.40, f"{uds}", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             
-            ax.text(0.46, 0.40, "PVP Medio:", fontsize=12, fontweight='bold', color='#555555', transform=ax.transAxes)
-            ax.text(0.68, 0.40, f"{pvp:,.0f} €", fontsize=11, color='#121212', transform=ax.transAxes)
+            ax.text(0.48, 0.40, "PVP Medio:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
+            ax.text(0.72, 0.40, f"{pvp:,.0f} €", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             
-            # Fila 2
-            ax.text(0.06, 0.15, "Unitario:", fontsize=12, fontweight='bold', color='#555555', transform=ax.transAxes)
-            ax.text(0.24, 0.15, f"{vrm:,.0f} €/m²", fontsize=11, color='#121212', transform=ax.transAxes)
+            ax.text(0.05, 0.15, "Unitario:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
+            ax.text(0.25, 0.15, f"{vrm:,.0f} €/m²", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             
-            ax.text(0.46, 0.15, "Tipologias:", fontsize=12, fontweight='bold', color='#555555', transform=ax.transAxes)
-            ax.text(0.69, 0.15, f"{tipos}", fontsize=11, color='#121212', transform=ax.transAxes)
+            ax.text(0.48, 0.15, "Tipologias:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
+            ax.text(0.72, 0.15, f"{tipos}", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             
             img_buf = io.BytesIO()
-            plt.savefig(img_buf, format='png', bbox_inches='tight', pad_inches=0.05)
+            plt.savefig(img_buf, format='png', bbox_inches='tight', pad_inches=0.02)
             plt.close(fig)
             img_buf.seek(0)
             
-            # Guardar en el zip
             zip_file.writestr(f"Ficha_{ref}.png", img_buf.read())
             
     zip_buffer.seek(0)
@@ -171,7 +169,6 @@ col_izq, col_mapa, col_der, col_ctrl = st.columns([1, 4, 1, 0.9])
 
 df_final = pd.DataFrame()
 ALTURA_CONTENEDOR = 820 
-ALTURA_TARJETA = 80 # Altura estimada en pixeles para calcular el algoritmo de espaciado
 
 # --- PANEL DERECHO (CONTROL Y FILTROS) ---
 with col_ctrl:
@@ -181,12 +178,12 @@ with col_ctrl:
         if file:
             mostrar_etiquetas = st.toggle("Ver Precios", value=True)
             
-            st.markdown("<p style='font-size:9px; font-weight:bold; margin-bottom:0px; color:#a0a0a0;'>ESTILO MAPA</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:9px; font-weight:bold; margin-bottom:0px; margin-top:5px; color:#a0a0a0;'>MAPA</p>", unsafe_allow_html=True)
             c_map1, c_map2 = st.columns(2)
             with c_map1:
                 tipo_vista = st.selectbox("Vista", ["Callejero", "Satelite"], label_visibility="collapsed")
             with c_map2:
-                estilo_mapa = st.selectbox("Estilo", ["Estandar", "Escala de Grises", "Azul Oscuro"], label_visibility="collapsed")
+                estilo_mapa = st.selectbox("Estilo", ["Estandar", "Escala de Grises", "Azul Plano"], label_visibility="collapsed")
             
             st.markdown("---")
             
@@ -265,7 +262,6 @@ with col_ctrl:
 
                     st.markdown("---")
                     
-                    # Botón Descargar Fichas ZIP
                     zip_data = generate_zip_images(df_visible, cols)
                     st.download_button(
                         label="Descargar Fichas PNG (.zip)",
@@ -336,11 +332,10 @@ if file and not df_filtered.empty:
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
-    # REPARTO Y ESPACIADO DINAMICO INTELIGENTE
+    # ALGORITMO DE ESPACIADO DINAMICO "EFECTO MUELLE"
     TOTAL_CARDS = len(df_visible)
-    MAX_LEFT_CAPACITY = 11
+    MAX_LEFT_CAPACITY = 10
     
-    # Subdividir los datos
     if TOTAL_CARDS <= MAX_LEFT_CAPACITY:
         left_df, right_df = df_visible, pd.DataFrame()
     else:
@@ -351,9 +346,10 @@ if file and not df_filtered.empty:
         num_cards = len(df_subset)
         if num_cards == 0: return
         
-        # Algoritmo de calculo de espacio vacio (Se reparte el hueco sobrante)
-        espacio_vacio = ALTURA_CONTENEDOR - (num_cards * ALTURA_TARJETA)
-        gap = max(4, espacio_vacio // (num_cards + 1)) # Minimo 4px de hueco
+        # Calculo matematico para repartir el espacio vacio sobrante
+        # 75px es la altura aproximada de una tarjeta con su boton
+        espacio_sobrante = max(0, ALTURA_CONTENEDOR - (num_cards * 75))
+        gap = max(4, espacio_sobrante // (num_cards + 1)) 
         
         st.markdown(f"<div style='height:{gap}px;'></div>", unsafe_allow_html=True)
         for _, row in df_subset.iterrows():
@@ -370,28 +366,21 @@ if file and not df_filtered.empty:
 
     # MAPA
     with col_mapa:
-        # zoom_control=True de vuelta
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
-        if tipo_vista == "Callejero":
-            if estilo_mapa == "Estandar":
-                tiles_url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-            elif estilo_mapa == "Escala de Grises":
-                tiles_url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-            else: 
-                tiles_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            
-            folium.TileLayer(tiles=tiles_url, attr='CartoDB', name='Callejero', overlay=False).add_to(m)
-            
-        else: # Satelite
-            folium.TileLayer(
-                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                attr='Esri', name='Satelite Base', overlay=False
-            ).add_to(m)
-            folium.TileLayer(
-                tiles='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
-                attr='CartoDB', name='Etiquetas Limpias', overlay=True
-            ).add_to(m)
+        # Estilos Nativos de Google Maps (Elimina el parpadeo porque no usa CSS)
+        estilos_google = {
+            "Estandar": "s.t%3A3%7Cp.v%3Aoff",
+            "Escala de Grises": "s.t%3Aall%7Cp.s%3A-100%2Cs.t%3A3%7Cp.v%3Aoff",
+            "Azul Plano": "s.e%3Ag%7Cp.c%3A%231b3a57%2Cs.t%3Aw%7Cs.e%3Ag%7Cp.c%3A%230d233a%2Cs.e%3Al.t.f%7Cp.c%3A%23ffffff%2Cs.e%3Al.t.s%7Cp.c%3A%23000000%2Cs.t%3A3%7Cp.v%3Aoff"
+        }
+        estilo_seleccionado = estilos_google[estilo_mapa]
+        tipo_lyrs = "y" if tipo_vista == "Satelite" else "m"
+
+        folium.TileLayer(
+            tiles=f"https://mt1.google.com/vt/lyrs={tipo_lyrs}&x={{x}}&y={{y}}&z={{z}}&apistyle={estilo_seleccionado}",
+            attr="Google", name=tipo_vista, control=False
+        ).add_to(m)
 
         if not df_visible.empty:
             if not st.session_state.get('do_filter_view'):
