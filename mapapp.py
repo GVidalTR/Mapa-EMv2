@@ -6,12 +6,13 @@ from streamlit_folium import st_folium
 # --- CONFIGURACIÓN DE PÁGINA Y MEMORIA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
 
-# Memoria para ocultar comparables
+# Memoria de la aplicación
 if 'hidden_promos' not in st.session_state:
     st.session_state.hidden_promos = set()
-# Memoria para forzar el reseteo de filtros
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
+if 'do_filter_view' not in st.session_state:
+    st.session_state.do_filter_view = False
 
 # --- ESTILOS CSS TEMA OSCURO ---
 st.markdown("""
@@ -36,7 +37,7 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
     min-height: 70px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
-.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 5px;}
+.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 15px;}
 .promo-pill-ui {
     background-color: #3a86ff; color: white; border-radius: 10px;
     min-width: 26px; height: 18px; display: flex; justify-content: center;
@@ -60,6 +61,27 @@ div.stButton > button {
     background-color: transparent; border: 1px solid #3a3a3a; color: #a0a0a0; border-radius: 4px; display: flex; margin: auto;
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
+
+/* Botón de la Tarjeta (Micro-cruz) */
+.btn-micro > div > button { height: 18px !important; width: 18px !important; font-size: 9px !important; border: none !important;}
+
+/* Botón Exportar / Encuadrar */
+.btn-action {
+    background-color: #3a86ff; color: white !important; padding: 6px 12px; border-radius: 4px;
+    text-decoration: none; font-size: 11px; font-weight: bold; display: inline-block; width: 100%; text-align: center;
+    border: 1px solid #2a66cc; transition: 0.2s; cursor: pointer;
+}
+.btn-action:hover { background-color: #2a66cc; }
+
+/* MODO IMPRESIÓN */
+@media print {
+    [data-testid="stSidebar"], .stFileUploader, [data-testid="stExpander"], .btn-action, div.stButton { display: none !important; }
+    .block-container { max-width: 100% !important; padding: 0 !important; }
+    .promo-card { border: 1px solid #ccc !important; background-color: white !important; }
+    p, span, .promo-details, .promo-name { color: black !important; }
+    .app-header { background-color: white !important; border-bottom: 2px solid #ccc !important; color: black !important; }
+    .app-title { color: black !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -114,6 +136,10 @@ ALTURA_CONTENEDOR = 820
 # --- PANEL DERECHO (CONTROL Y FILTROS) ---
 with col_ctrl:
     with st.container(height=ALTURA_CONTENEDOR, border=False):
+        # Botón Exportar PDF/Vista
+        st.markdown("<a href='javascript:window.parent.print()' class='btn-action'>Exportar Vista</a>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
         file = st.file_uploader("Subir Excel", type=['xlsx'], label_visibility="collapsed")
         
         if file:
@@ -122,7 +148,7 @@ with col_ctrl:
             
             st.markdown("---")
             
-            # Botones de Acción Global
+            # BOTONES DE ACCIÓN GLOBAL
             c_btn1, c_btn2 = st.columns(2)
             with c_btn1:
                 if st.button("Reset Filtros", use_container_width=True):
@@ -132,12 +158,15 @@ with col_ctrl:
                 if st.button("Reset Ocultos", use_container_width=True):
                     st.session_state.hidden_promos.clear()
                     st.rerun()
+            
+            # EL NUEVO BOTÓN MAGNÍFICO DE FILTRAR POR VISTA
+            if st.button("🎯 Encuadrar Vista", use_container_width=True, help="Mueve el mapa primero. Esto ocultará los comparables que queden fuera de la pantalla."):
+                st.session_state.do_filter_view = True
                     
             st.markdown("---")
 
             df_raw, cols = load_data(file)
             if not df_raw.empty:
-                # Modificamos la función para que incluya la key de reseteo
                 def mk_filter(lbl, col_name, f_key):
                     if col_name and col_name in df_raw.columns:
                         opts = sorted(df_raw[col_name].dropna().unique().astype(str))
@@ -174,23 +203,48 @@ with col_ctrl:
                     df_promo = df_filtered.groupby(cols['ref']).agg(agg_rules).reset_index()
                     counts = df_filtered.groupby(cols['ref']).size().reset_index(name='UDS')
                     df_promo = pd.merge(df_promo, counts, on=cols['ref'])
+
+                    # LÓGICA DE FILTRADO POR VISTA (Bounding Box)
+                    if st.session_state.do_filter_view:
+                        st.session_state.do_filter_view = False # Apagar el flag
+                        map_data = st.session_state.get("main_map")
+                        
+                        if map_data and map_data.get("bounds"):
+                            b = map_data["bounds"]
+                            sw_lat, sw_lon = b['_southWest']['lat'], b['_southWest']['lng']
+                            ne_lat, ne_lon = b['_northEast']['lat'], b['_northEast']['lng']
+                            
+                            for _, row in df_promo.iterrows():
+                                lat, lon = row['lat'], row['lon']
+                                ref = str(row[cols['ref']])
+                                # Si las coordenadas NO están dentro de los límites del mapa visible...
+                                if not (sw_lat <= lat <= ne_lat and sw_lon <= lon <= ne_lon):
+                                    st.session_state.hidden_promos.add(ref)
+                            
+                            st.rerun() # Recargamos para aplicar las ocultaciones
+                        else:
+                            st.warning("⚠️ Mueve el mapa un poco primero para registrar la posición.")
                     
+                    # Separar Visibles y Ocultos
                     df_visible = df_promo[~df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
                     df_ocultos = df_promo[df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
 
                     st.markdown("---")
-                    with st.expander(f"Ocultos ({len(df_ocultos)})"):
+                    with st.expander(f"📦 Ocultos ({len(df_ocultos)})"):
                         if not df_ocultos.empty:
+                            if st.button("Restaurar Todos", use_container_width=True):
+                                st.session_state.hidden_promos.clear()
+                                st.rerun()
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
                                 nombre_oculto = str(row.get(cols['nombre'], ref_oculta))
                                 if nombre_oculto.lower() in ['nan', 'none', '']: nombre_oculto = ref_oculta
 
-                                cx_card, cx_btn = st.columns([0.80, 0.20])
+                                cx_card, cx_btn = st.columns([0.85, 0.15], vertical_alignment="center")
                                 with cx_card:
                                     st.markdown(f"<div style='background:#1e1e1e; padding:5px; border-radius:4px; margin-bottom:4px;'><span style='font-size:10px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span> <span style='font-size:10px; color:#aaa;'>{nombre_oculto[:12]}...</span></div>", unsafe_allow_html=True)
                                 with cx_btn:
-                                    if st.button("V", key=f"res_{ref_oculta}", use_container_width=True):
+                                    if st.button("V", key=f"res_{ref_oculta}"):
                                         st.session_state.hidden_promos.remove(ref_oculta)
                                         st.rerun()
                         else:
@@ -218,27 +272,29 @@ if file and not df_filtered.empty:
         </div>"""
 
         if side == "left":
-            c_btn, c_card = st.columns([0.15, 0.85])
+            c_btn, c_card = st.columns([0.1, 0.9], vertical_alignment="center")
             with c_btn:
-                st.write("") # Espaciador vertical
-                if st.button("X", key=f"hide_{ref_str}", use_container_width=True):
+                st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
+                if st.button("✕", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
         else:
-            c_card, c_btn = st.columns([0.85, 0.15])
+            c_card, c_btn = st.columns([0.9, 0.1], vertical_alignment="center")
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
             with c_btn:
-                st.write("") # Espaciador vertical
-                if st.button("X", key=f"hide_{ref_str}", use_container_width=True):
+                st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
+                if st.button("✕", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
     # LÓGICA DE REPARTO INTELIGENTE DE TARJETAS
     TOTAL_CARDS = len(df_visible)
-    MAX_LEFT_CAPACITY = 10 # Si hay 10 o menos, van todas a la izquierda
+    MAX_LEFT_CAPACITY = 10 
 
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
@@ -276,8 +332,11 @@ if file and not df_filtered.empty:
         ).add_to(m)
 
         if not df_visible.empty:
-            sw, ne = df_visible[['lat', 'lon']].min().values.tolist(), df_visible[['lat', 'lon']].max().values.tolist()
-            m.fit_bounds([sw, ne])
+            # En vez de forzar el encuadre siempre (lo que estropearía el "Encuadrar Vista"), 
+            # solo forzamos si el usuario no acaba de hacer un filtro de vista
+            if not st.session_state.get('do_filter_view'):
+                sw, ne = df_visible[['lat', 'lon']].min().values.tolist(), df_visible[['lat', 'lon']].max().values.tolist()
+                m.fit_bounds([sw, ne])
             
             for i, row in df_visible.iterrows():
                 ref_str = str(row[cols['ref']])
@@ -315,6 +374,7 @@ if file and not df_filtered.empty:
                 ).add_to(m)
 
         folium.LayerControl(position='topright').add_to(m)
+        # Recogemos la salida de st_folium con una key para poder leer el bounding box
         st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map")
 
 else:
