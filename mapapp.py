@@ -70,7 +70,6 @@ def load_data(file):
         df = pd.read_excel(xls, sheet_name='EEMM')
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # Identificamos columnas. Buscamos independientemente REF y NOMBRE
         c = {
             'coord': next((x for x in df.columns if 'COORD' in x), None),
             'ref': next((x for x in df.columns if 'REF' in x), None),
@@ -79,7 +78,8 @@ def load_data(file):
             'tier': 'TIER', 'zona': 'ZONA', 'ciudad': next((x for x in df.columns if 'CIUDAD' in x), None),
             'planta': 'PLANTA', 'dorm': 'Nº DORM'
         }
-        # Fallbacks por si falta alguna de las dos
+        
+        # Compensar si falta el nombre o la referencia
         if not c['ref']: c['ref'] = c['nombre']
         if not c['nombre']: c['nombre'] = c['ref']
 
@@ -111,7 +111,7 @@ ALTURA_CONTENEDOR = 820
 # --- PANEL DERECHO (CONTROL Y FILTROS) ---
 with col_ctrl:
     with st.container(height=ALTURA_CONTENEDOR, border=False):
-        st.markdown("##### 📂 FUENTE DE DATOS")
+        st.markdown("##### FUENTE DE DATOS")
         file = st.file_uploader("Subir Excel", type=['xlsx'], label_visibility="collapsed")
         
         mostrar_etiquetas = st.toggle("Mostrar Etiquetas Precio", value=True)
@@ -120,7 +120,7 @@ with col_ctrl:
             df_raw, cols = load_data(file)
             if not df_raw.empty:
                 st.markdown("---")
-                st.markdown("##### 🔍 FILTROS")
+                st.markdown("##### FILTROS")
                 
                 def mk_filter(lbl, col_name):
                     if col_name and col_name in df_raw.columns:
@@ -146,12 +146,17 @@ with col_ctrl:
                 df_filtered = df_raw[mask]
                 
                 if not df_filtered.empty:
+                    # Lógica ajustada para evitar el ValueError de columnas duplicadas
                     agg_rules = {
                         'lat':'first', 'lon':'first', 
-                        cols['nombre']:'first', # Guardamos el nombre real
                         cols['vrm']:'median' if cols['vrm'] in df_filtered.columns else 'first',
                         cols['pvp']:'mean' if cols['pvp'] in df_filtered.columns else 'first'
                     }
+                    
+                    # Solo añadimos 'nombre' si es distinto a 'ref' para no sobreescribir
+                    if cols['nombre'] and cols['nombre'] != cols['ref']:
+                        agg_rules[cols['nombre']] = 'first'
+                        
                     if cols['dorm']: agg_rules[cols['dorm']] = clean_dorm
                     
                     df_promo = df_filtered.groupby(cols['ref']).agg(agg_rules).reset_index()
@@ -164,15 +169,15 @@ with col_ctrl:
 
                     st.markdown("---")
                     # DEPÓSITO DE OCULTOS
-                    with st.expander(f"📦 Ocultos ({len(df_ocultos)})"):
+                    with st.expander(f"Comparables Ocultos ({len(df_ocultos)})"):
                         if not df_ocultos.empty:
-                            if st.button("🔄 Restaurar Todos", use_container_width=True):
+                            if st.button("Restaurar Todos", use_container_width=True):
                                 st.session_state.hidden_promos.clear()
                                 st.rerun()
                             
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
-                                nombre_oculto = str(row[cols['nombre']])
+                                nombre_oculto = str(row[cols['nombre']]) if cols['nombre'] in row else ref_oculta
                                 cx_card, cx_btn = st.columns([0.85, 0.15], vertical_alignment="center")
                                 with cx_card:
                                     st.markdown(f"<div style='background:#1e1e1e; padding:5px; border-radius:4px; margin-bottom:4px;'><span style='font-size:10px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span> <span style='font-size:10px; color:#aaa;'>{nombre_oculto[:15]}...</span></div>", unsafe_allow_html=True)
@@ -188,7 +193,7 @@ if file and not df_filtered.empty:
     
     def render_promo_card(row, is_hidden=False):
         ref_str = str(row[cols['ref']])
-        nombre_str = str(row[cols['nombre']])
+        nombre_str = str(row[cols['nombre']]) if cols['nombre'] in row else ref_str
         tipos = row.get(cols['dorm'], 'N/A')
         
         c_card, c_btn = st.columns([0.88, 0.12], vertical_alignment="center")
