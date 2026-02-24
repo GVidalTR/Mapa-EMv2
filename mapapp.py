@@ -3,10 +3,10 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 
-# --- CONFIGURACIÓN DE PÁGINA Y MEMORIA ---
+# --- CONFIGURACION DE PAGINA Y MEMORIA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
 
-# Memoria de la aplicación
+# Memoria de la aplicacion
 if 'hidden_promos' not in st.session_state:
     st.session_state.hidden_promos = set()
 if 'reset_key' not in st.session_state:
@@ -62,33 +62,15 @@ div.stButton > button {
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 
-/* Botón de la Tarjeta (Micro-cruz) */
+/* Boton de la Tarjeta (Micro-cruz) */
 .btn-micro > div > button { height: 18px !important; width: 18px !important; font-size: 9px !important; border: none !important;}
-
-/* Botón Exportar / Encuadrar */
-.btn-action {
-    background-color: #3a86ff; color: white !important; padding: 6px 12px; border-radius: 4px;
-    text-decoration: none; font-size: 11px; font-weight: bold; display: inline-block; width: 100%; text-align: center;
-    border: 1px solid #2a66cc; transition: 0.2s; cursor: pointer;
-}
-.btn-action:hover { background-color: #2a66cc; }
-
-/* MODO IMPRESIÓN */
-@media print {
-    [data-testid="stSidebar"], .stFileUploader, [data-testid="stExpander"], .btn-action, div.stButton { display: none !important; }
-    .block-container { max-width: 100% !important; padding: 0 !important; }
-    .promo-card { border: 1px solid #ccc !important; background-color: white !important; }
-    p, span, .promo-details, .promo-name { color: black !important; }
-    .app-header { background-color: white !important; border-bottom: 2px solid #ccc !important; color: black !important; }
-    .app-title { color: black !important; }
-}
 </style>
 """, unsafe_allow_html=True)
 
 # --- HEADER VISUAL ---
-st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:10px; color:#b0b0b0; margin:0;">Análisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:10px; color:#b0b0b0; margin:0;">Analisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
 
-# --- LÓGICA DE DATOS Y LIMPIEZA ---
+# --- LOGICA DE DATOS Y LIMPIEZA ---
 @st.cache_data
 def load_data(file):
     try:
@@ -136,19 +118,21 @@ ALTURA_CONTENEDOR = 820
 # --- PANEL DERECHO (CONTROL Y FILTROS) ---
 with col_ctrl:
     with st.container(height=ALTURA_CONTENEDOR, border=False):
-        # Botón Exportar PDF/Vista
-        st.markdown("<a href='javascript:window.parent.print()' class='btn-action'>Exportar Vista</a>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-
         file = st.file_uploader("Subir Excel", type=['xlsx'], label_visibility="collapsed")
         
         if file:
             mostrar_etiquetas = st.toggle("Ver Precios", value=True)
-            estilo_mapa = st.selectbox("Estilo Mapa", ["Estándar", "Escala de Grises", "Azul Oscuro"])
+            
+            # Controles de Mapa integrados en el lateral
+            c_map1, c_map2 = st.columns(2)
+            with c_map1:
+                tipo_vista = st.selectbox("Vista", ["Satelite", "Callejero"])
+            with c_map2:
+                estilo_mapa = st.selectbox("Estilo", ["Estandar", "Escala de Grises", "Azul Oscuro"])
             
             st.markdown("---")
             
-            # BOTONES DE ACCIÓN GLOBAL
+            # BOTONES DE ACCION GLOBAL
             c_btn1, c_btn2 = st.columns(2)
             with c_btn1:
                 if st.button("Reset Filtros", use_container_width=True):
@@ -159,8 +143,8 @@ with col_ctrl:
                     st.session_state.hidden_promos.clear()
                     st.rerun()
             
-            # EL NUEVO BOTÓN MAGNÍFICO DE FILTRAR POR VISTA
-            if st.button("🎯 Encuadrar Vista", use_container_width=True, help="Mueve el mapa primero. Esto ocultará los comparables que queden fuera de la pantalla."):
+            # BOTON DE FILTRADO DE VISTA
+            if st.button("Filtrar vista", use_container_width=True):
                 st.session_state.do_filter_view = True
                     
             st.markdown("---")
@@ -173,7 +157,7 @@ with col_ctrl:
                         return st.multiselect(lbl, opts, default=opts, key=f"{f_key}_{st.session_state.reset_key}")
                     return []
                 
-                f_tipo = mk_filter("Tipología", cols['tipo'], "tipo")
+                f_tipo = mk_filter("Tipologia", cols['tipo'], "tipo")
                 f_tier = mk_filter("Tier", cols['tier'], "tier")
                 f_zona = mk_filter("Zona", cols['zona'], "zona")
                 f_ciudad = mk_filter("Ciudad", cols['ciudad'], "ciudad")
@@ -204,9 +188,9 @@ with col_ctrl:
                     counts = df_filtered.groupby(cols['ref']).size().reset_index(name='UDS')
                     df_promo = pd.merge(df_promo, counts, on=cols['ref'])
 
-                    # LÓGICA DE FILTRADO POR VISTA (Bounding Box)
+                    # LOGICA DE FILTRADO POR VISTA (Bounding Box)
                     if st.session_state.do_filter_view:
-                        st.session_state.do_filter_view = False # Apagar el flag
+                        st.session_state.do_filter_view = False
                         map_data = st.session_state.get("main_map")
                         
                         if map_data and map_data.get("bounds"):
@@ -217,20 +201,17 @@ with col_ctrl:
                             for _, row in df_promo.iterrows():
                                 lat, lon = row['lat'], row['lon']
                                 ref = str(row[cols['ref']])
-                                # Si las coordenadas NO están dentro de los límites del mapa visible...
                                 if not (sw_lat <= lat <= ne_lat and sw_lon <= lon <= ne_lon):
                                     st.session_state.hidden_promos.add(ref)
                             
-                            st.rerun() # Recargamos para aplicar las ocultaciones
-                        else:
-                            st.warning("⚠️ Mueve el mapa un poco primero para registrar la posición.")
+                            st.rerun()
                     
                     # Separar Visibles y Ocultos
                     df_visible = df_promo[~df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
                     df_ocultos = df_promo[df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
 
                     st.markdown("---")
-                    with st.expander(f"📦 Ocultos ({len(df_ocultos)})"):
+                    with st.expander(f"Ocultos ({len(df_ocultos)})"):
                         if not df_ocultos.empty:
                             if st.button("Restaurar Todos", use_container_width=True):
                                 st.session_state.hidden_promos.clear()
@@ -247,8 +228,6 @@ with col_ctrl:
                                     if st.button("V", key=f"res_{ref_oculta}"):
                                         st.session_state.hidden_promos.remove(ref_oculta)
                                         st.rerun()
-                        else:
-                            st.caption("Vacío.")
 
 # --- VISTA CENTRAL Y LATERALES ---
 if file and not df_filtered.empty:
@@ -275,7 +254,7 @@ if file and not df_filtered.empty:
             c_btn, c_card = st.columns([0.1, 0.9], vertical_alignment="center")
             with c_btn:
                 st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
-                if st.button("✕", key=f"hide_{ref_str}"):
+                if st.button("X", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -287,12 +266,12 @@ if file and not df_filtered.empty:
                 st.markdown(card_html, unsafe_allow_html=True)
             with c_btn:
                 st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
-                if st.button("✕", key=f"hide_{ref_str}"):
+                if st.button("X", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
-    # LÓGICA DE REPARTO INTELIGENTE DE TARJETAS
+    # LOGICA DE REPARTO INTELIGENTE DE TARJETAS
     TOTAL_CARDS = len(df_visible)
     MAX_LEFT_CAPACITY = 10 
 
@@ -310,30 +289,33 @@ if file and not df_filtered.empty:
                 mid = TOTAL_CARDS // 2 + (TOTAL_CARDS % 2)
                 for _, row in df_visible.iloc[mid:].iterrows(): render_promo_card(row, side="right")
 
-    # Generar Mapa con Selector de Estilos
+    # Generar Mapa SIN Controles Superpuestos
     with col_mapa:
-        m = folium.Map(tiles=None, control_scale=True)
+        m = folium.Map(tiles=None, control_scale=False, zoom_control=False)
         
-        estilos_google = {
-            "Estándar": "s.t%3A3%7Cp.v%3Aoff",
-            "Escala de Grises": "s.t%3Aall%7Cp.s%3A-100%2Cs.t%3A3%7Cp.v%3Aoff",
-            "Azul Oscuro": "s.t%3Aall%7Cs.e%3Ag%7Cp.c%3A%2315202b%2Cs.t%3Aall%7Cs.e%3Al.t.f%7Cp.c%3A%23ffffff%2Cs.t%3A3%7Cp.v%3Aoff"
-        }
-        estilo_seleccionado = estilos_google[estilo_mapa]
+        # Capa base siempre limpia de negocios
+        NO_POI_STYLE = "s.t%3A3%7Cp.v%3Aoff"
+        tipo_lyrs = "y" if tipo_vista == "Satelite" else "m"
 
         folium.TileLayer(
-            tiles=f"https://mt1.google.com/vt/lyrs=y&x={{x}}&y={{y}}&z={{z}}&apistyle={estilo_seleccionado}",
-            attr="Google", name="Satélite", control=True
+            tiles=f"https://mt1.google.com/vt/lyrs={tipo_lyrs}&x={{x}}&y={{y}}&z={{z}}&apistyle={NO_POI_STYLE}",
+            attr="Google", name=tipo_vista, control=False
         ).add_to(m)
 
-        folium.TileLayer(
-            tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&apistyle={estilo_seleccionado}",
-            attr="Google", name="Callejero", control=True
-        ).add_to(m)
+        # Inyeccion de filtros CSS a la capa de mapas para colores puros
+        map_filter_css = ""
+        if estilo_mapa == "Escala de Grises":
+            map_filter_css = "<style>.leaflet-tile-pane { filter: grayscale(100%) contrast(110%); }</style>"
+        elif estilo_mapa == "Azul Oscuro":
+            if tipo_vista == "Callejero":
+                map_filter_css = "<style>.leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }</style>"
+            else:
+                map_filter_css = "<style>.leaflet-tile-pane { filter: brightness(45%) contrast(120%) saturate(70%); }</style>"
+
+        if map_filter_css:
+            m.get_root().html.add_child(folium.Element(map_filter_css))
 
         if not df_visible.empty:
-            # En vez de forzar el encuadre siempre (lo que estropearía el "Encuadrar Vista"), 
-            # solo forzamos si el usuario no acaba de hacer un filtro de vista
             if not st.session_state.get('do_filter_view'):
                 sw, ne = df_visible[['lat', 'lon']].min().values.tolist(), df_visible[['lat', 'lon']].max().values.tolist()
                 m.fit_bounds([sw, ne])
@@ -373,8 +355,6 @@ if file and not df_filtered.empty:
                     icon=folium.DivIcon(html=marker_html, icon_anchor=(14, 10))
                 ).add_to(m)
 
-        folium.LayerControl(position='topright').add_to(m)
-        # Recogemos la salida de st_folium con una key para poder leer el bounding box
         st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map")
 
 else:
@@ -388,7 +368,7 @@ else:
                 <h4 style="color: #ffffff; font-size: 16px; margin-top: 0; margin-bottom: 15px;">Instrucciones de Inicio:</h4>
                 <ol style="color: #e0e0e0; font-size: 14px; line-height: 1.8; margin-bottom: 0; padding-left: 20px;">
                     <li>Carga tu archivo Excel en el panel lateral derecho.</li>
-                    <li>El sistema procesará la pestaña <b>EEMM</b> automáticamente.</li>
+                    <li>El sistema procesara la pestana EEMM automaticamente.</li>
                     <li>Se requieren las columnas clave: COORD, REF, PVP y VRM SCIC.</li>
                     <li>Utiliza los filtros para segmentar el mercado en tiempo real.</li>
                 </ol>
