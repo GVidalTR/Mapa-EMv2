@@ -6,7 +6,6 @@ from streamlit_folium import st_folium
 # --- CONFIGURACIÓN DE PÁGINA Y MEMORIA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
 
-# Inicializar el "Depósito de ocultos" en la memoria de la app
 if 'hidden_promos' not in st.session_state:
     st.session_state.hidden_promos = set()
 
@@ -29,7 +28,7 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 /* Tarjetas de Promoción Compactas */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
-    padding: 6px 10px; margin-bottom: 4px; transition: all 0.2s;
+    padding: 6px 10px; margin-bottom: 2px; transition: all 0.2s;
     height: 65px; display: flex; flex-direction: column; justify-content: center;
 }
 .promo-card:hover { border-color: #3a86ff; }
@@ -46,16 +45,17 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 .promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.2 !important; }
 .promo-details b { color: #ffffff !important; }
 
-/* Botones y Filtros */
+/* Filtros */
 div[data-baseweb="select"] > div { background-color: #252525 !important; border-color: #3a3a3a !important; color: white !important; min-height: 28px !important;}
 div[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; border: none; }
 .stMultiSelect label { font-size: 11px !important; font-weight: bold !important; color: #e0e0e0 !important;}
 
-/* Hacer los botones de ocultar más pequeños */
+/* Estilo Botones Discretos (Cruz y Tick) */
 div.stButton > button {
-    height: 30px; padding: 0px 8px; font-size: 10px; background-color: #252525; border: 1px solid #404040; color: white;
+    height: 26px; width: 100%; padding: 0px !important; font-size: 12px !important; 
+    background-color: transparent; border: 1px solid #404040; color: #a0a0a0; border-radius: 4px;
 }
-div.stButton > button:hover { border-color: #ff4d4d; color: #ff4d4d; }
+div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -69,13 +69,20 @@ def load_data(file):
         xls = pd.ExcelFile(file)
         df = pd.read_excel(xls, sheet_name='EEMM')
         df.columns = [str(c).strip().upper() for c in df.columns]
+        
+        # Identificamos columnas. Buscamos independientemente REF y NOMBRE
         c = {
             'coord': next((x for x in df.columns if 'COORD' in x), None),
-            'ref': next((x for x in df.columns if any(k in x for k in ['REF', 'PROMOCION', 'NOMBRE'])), None),
+            'ref': next((x for x in df.columns if 'REF' in x), None),
+            'nombre': next((x for x in df.columns if any(k in x for k in ['PROMOCION', 'NOMBRE', 'PROYECTO'])), None),
             'vrm': 'VRM SCIC', 'pvp': 'PVP', 'tipo': next((x for x in df.columns if 'TIPOLOGI' in x), None),
             'tier': 'TIER', 'zona': 'ZONA', 'ciudad': next((x for x in df.columns if 'CIUDAD' in x), None),
             'planta': 'PLANTA', 'dorm': 'Nº DORM'
         }
+        # Fallbacks por si falta alguna de las dos
+        if not c['ref']: c['ref'] = c['nombre']
+        if not c['nombre']: c['nombre'] = c['ref']
+
         if c['coord']:
             coords = df[c['coord']].astype(str).str.replace(' ', '').str.split(',', expand=True)
             df['lat'] = pd.to_numeric(coords[0], errors='coerce')
@@ -87,14 +94,12 @@ def load_data(file):
         return pd.DataFrame(), {}
 
 def clean_dorm(x):
-    """Función para limpiar, unificar y ordenar tipologías (ej: 1D-2D-3D)"""
     items = set()
     for i in x.dropna():
         s = str(i).replace('.0', '').strip().upper()
         if s:
             if not s.endswith('D'): s += 'D'
             items.add(s)
-    # Ordenamos alfabéticamente/numéricamente y unimos con guiones
     return "-".join(sorted(list(items)))
 
 # --- LAYOUT DE COLUMNAS ---
@@ -130,7 +135,6 @@ with col_ctrl:
                 f_planta = mk_filter("Planta", cols['planta'])
                 f_dorm = mk_filter("Dormitorios", cols['dorm'])
 
-                # Aplicar filtros base
                 mask = pd.Series(True, index=df_raw.index)
                 if cols['tipo']: mask &= df_raw[cols['tipo']].astype(str).isin(f_tipo)
                 if cols['tier']: mask &= df_raw[cols['tier']].astype(str).isin(f_tier)
@@ -144,88 +148,92 @@ with col_ctrl:
                 if not df_filtered.empty:
                     agg_rules = {
                         'lat':'first', 'lon':'first', 
+                        cols['nombre']:'first', # Guardamos el nombre real
                         cols['vrm']:'median' if cols['vrm'] in df_filtered.columns else 'first',
-                        cols['pvp']:'mean' if cols['pvp'] in df_filtered.columns else 'first', 
-                        cols['ref']:'count'
+                        cols['pvp']:'mean' if cols['pvp'] in df_filtered.columns else 'first'
                     }
                     if cols['dorm']: agg_rules[cols['dorm']] = clean_dorm
                     
-                    # Agrupamos por promoción
-                    df_promo = df_filtered.groupby(cols['ref']).agg(agg_rules).rename(columns={cols['ref']: 'UDS'}).reset_index()
+                    df_promo = df_filtered.groupby(cols['ref']).agg(agg_rules).reset_index()
+                    counts = df_filtered.groupby(cols['ref']).size().reset_index(name='UDS')
+                    df_promo = pd.merge(df_promo, counts, on=cols['ref'])
                     
                     # --- LÓGICA DE OCULTACIÓN ---
-                    # Dividimos entre los que se deben mostrar y los que están en el "Depósito"
                     df_visible = df_promo[~df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
                     df_ocultos = df_promo[df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
 
                     st.markdown("---")
                     # DEPÓSITO DE OCULTOS
-                    with st.expander(f"📦 Comparables Ocultos ({len(df_ocultos)})"):
-                        if df_ocultos.empty:
-                            st.caption("No hay promociones ocultas.")
-                        else:
+                    with st.expander(f"📦 Ocultos ({len(df_ocultos)})"):
+                        if not df_ocultos.empty:
+                            if st.button("🔄 Restaurar Todos", use_container_width=True):
+                                st.session_state.hidden_promos.clear()
+                                st.rerun()
+                            
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
-                                cx1, cx2 = st.columns([0.7, 0.3])
-                                cx1.markdown(f"<span style='font-size:12px;'>{ref_oculta}</span>", unsafe_allow_html=True)
-                                if cx2.button("Restaurar", key=f"res_{ref_oculta}"):
-                                    st.session_state.hidden_promos.remove(ref_oculta)
-                                    st.rerun()
+                                nombre_oculto = str(row[cols['nombre']])
+                                cx_card, cx_btn = st.columns([0.85, 0.15], vertical_alignment="center")
+                                with cx_card:
+                                    st.markdown(f"<div style='background:#1e1e1e; padding:5px; border-radius:4px; margin-bottom:4px;'><span style='font-size:10px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span> <span style='font-size:10px; color:#aaa;'>{nombre_oculto[:15]}...</span></div>", unsafe_allow_html=True)
+                                with cx_btn:
+                                    if st.button("✓", key=f"res_{ref_oculta}", help="Restaurar"):
+                                        st.session_state.hidden_promos.remove(ref_oculta)
+                                        st.rerun()
+                        else:
+                            st.caption("No hay promociones ocultas.")
 
 # --- VISTA CENTRAL Y LATERALES ---
 if file and not df_filtered.empty:
     
-    # Función de renderizado de tarjetas con botón
-    def render_promo_cards(data):
-        for i, row in data.iterrows():
-            ref_str = str(row[cols['ref']])
-            tipos = row.get(cols['dorm'], 'N/A')
+    def render_promo_card(row, is_hidden=False):
+        ref_str = str(row[cols['ref']])
+        nombre_str = str(row[cols['nombre']])
+        tipos = row.get(cols['dorm'], 'N/A')
+        
+        c_card, c_btn = st.columns([0.88, 0.12], vertical_alignment="center")
+        
+        with c_card:
+            st.markdown(f"""
+            <div class="promo-card">
+                <div class="promo-header">
+                    <div class="promo-pill-ui">{ref_str}</div>
+                    <p class="promo-name" title="{nombre_str}">{nombre_str}</p>
+                </div>
+                <div class="promo-details">
+                    Uds: <b>{row['UDS']}</b> | <b>{row.get(cols['vrm'], 0):,.0f} €/m²</b><br>
+                    Med: <b>{row.get(cols['pvp'], 0):,.0f}€</b> | Tip: {tipos}
+                </div>
+            </div>""", unsafe_allow_html=True)
             
-            # Usamos dos micro-columnas para la tarjeta y su botón de ocultar
-            c_card, c_btn = st.columns([0.85, 0.15])
-            
-            with c_card:
-                st.markdown(f"""
-                <div class="promo-card">
-                    <div class="promo-header">
-                        <div class="promo-pill-ui">{ref_str}</div>
-                        <p class="promo-name" title="{ref_str}">{ref_str}</p>
-                    </div>
-                    <div class="promo-details">
-                        Uds: <b>{row['UDS']}</b> | <b>{row.get(cols['vrm'], 0):,.0f} €/m²</b><br>
-                        Med: <b>{row.get(cols['pvp'], 0):,.0f}€</b> | Tip: {tipos}
-                    </div>
-                </div>""", unsafe_allow_html=True)
-                
-            with c_btn:
-                st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True) # Espaciador para centrar
-                if st.button("❌", key=f"hide_{ref_str}", help="Ocultar del mapa"):
+        with c_btn:
+            if not is_hidden:
+                if st.button("✕", key=f"hide_{ref_str}", help="Ocultar del mapa"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
 
-    # Repartimos solo los VISIBLES en las columnas izquierda y derecha
     mid = len(df_visible) // 2
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            render_promo_cards(df_visible.iloc[:mid])
+            for _, row in df_visible.iloc[:mid].iterrows(): render_promo_card(row)
 
     with col_der:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            render_promo_cards(df_visible.iloc[mid:])
+            for _, row in df_visible.iloc[mid:].iterrows(): render_promo_card(row)
 
-    # Generar Mapa solo con df_visible
+    # Generar Mapa
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=True)
         NO_POI_STYLE = "s.t%3A3%7Cp.v%3Aoff"
 
         folium.TileLayer(
             tiles=f"https://mt1.google.com/vt/lyrs=y&x={{x}}&y={{y}}&z={{z}}&apistyle={NO_POI_STYLE}",
-            attr="Google", name="Satélite Híbrido (Limpio)", control=True
+            attr="Google", name="Satélite Híbrido", control=True
         ).add_to(m)
 
         folium.TileLayer(
             tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&apistyle={NO_POI_STYLE}",
-            attr="Google", name="Callejero (Limpio)", control=True
+            attr="Google", name="Callejero", control=True
         ).add_to(m)
 
         if not df_visible.empty:
@@ -251,7 +259,6 @@ if file and not df_filtered.empty:
                         </div>
                     </div>
                     """
-                    icon_anchor = (14, 10)
                 else:
                     marker_html = f"""
                     <div style="drop-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: Arial, sans-serif;">
@@ -262,11 +269,10 @@ if file and not df_filtered.empty:
                         </div>
                     </div>
                     """
-                    icon_anchor = (14, 10)
                 
                 folium.Marker(
                     [row['lat'], row['lon']], 
-                    icon=folium.DivIcon(html=marker_html, icon_anchor=icon_anchor)
+                    icon=folium.DivIcon(html=marker_html, icon_anchor=(14, 10))
                 ).add_to(m)
 
         folium.LayerControl(position='topright').add_to(m)
