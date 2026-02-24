@@ -5,7 +5,7 @@ from streamlit_folium import st_folium
 import io
 import zipfile
 
-# Proteccion segura para matplotlib
+# Protección por si matplotlib no está instalado en el servidor
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -14,7 +14,7 @@ try:
 except ImportError:
     MATPLOTLIB_INSTALLED = False
 
-# --- CONFIGURACION DE PAGINA Y MEMORIA ---
+# --- CONFIGURACIÓN DE PÁGINA Y MEMORIA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
 
 if 'hidden_promos' not in st.session_state:
@@ -28,12 +28,9 @@ if 'do_filter_view' not in st.session_state:
 st.markdown("""
 <style>
 header[data-testid="stHeader"] { display: none !important; }
-.block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 99% !important; }
+.block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 98% !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
 p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin-bottom: 2px !important;}
-
-/* Forzar reduccion del espacio nativo de Streamlit para controlar nosotros el espaciado */
-[data-testid="stVerticalBlock"] { gap: 0rem !important; }
 
 /* Header */
 .app-header {
@@ -43,10 +40,10 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 18px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas base sin margenes (el Python calculara el hueco dinamicamente) */
+/* Tarjetas base: SEPARACIÓN RESTAURADA (margin-bottom: 12px) */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
-    padding: 8px 10px; margin-bottom: 0px !important; margin-top: 0px !important; transition: all 0.2s;
+    padding: 8px 10px; margin-bottom: 12px !important; transition: all 0.2s;
     min-height: 65px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
@@ -63,7 +60,7 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 .promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.3 !important; }
 .promo-details b { color: #ffffff !important; }
 
-/* Filtros Expandibles Hacia Abajo */
+/* Filtros Expandibles */
 div[data-baseweb="select"] > div { 
     background-color: #252525 !important; border-color: #3a3a3a !important; 
     min-height: 32px !important; height: auto !important; padding: 2px 4px !important; 
@@ -79,7 +76,7 @@ div.stButton > button {
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 
-/* Boton X Circular y Microscopico */
+/* Botón X Microscópico */
 .btn-micro { display: flex; justify-content: center; align-items: center; height: 100%; width: 100%; padding-top: 15px; }
 .btn-micro > div > button { 
     height: 18px !important; width: 18px !important; min-height: 18px !important; 
@@ -92,9 +89,9 @@ div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-
 """, unsafe_allow_html=True)
 
 # --- HEADER VISUAL ---
-st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:11px; color:#b0b0b0; margin:0;">Analisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:11px; color:#b0b0b0; margin:0;">Análisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
 
-# --- LOGICA DE DATOS Y EXPORTACION ---
+# --- LÓGICA DE DATOS Y EXPORTACIÓN ---
 @st.cache_data
 def load_data(file):
     try:
@@ -152,17 +149,13 @@ def generate_zip_images(df, cols):
             ax.add_patch(plt.Rectangle((0, 0), 0.02, 1, facecolor='#3a86ff', transform=ax.transAxes))
             
             ax.text(0.05, 0.72, f"{ref} - {nombre}", fontsize=14, fontweight='heavy', color='#003366', transform=ax.transAxes)
-            
             ax.text(0.05, 0.40, "Unidades:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
             ax.text(0.25, 0.40, f"{uds}", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
-            
             ax.text(0.48, 0.40, "PVP Medio:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
             ax.text(0.72, 0.40, f"{pvp:,.0f} €", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
-            
             ax.text(0.05, 0.15, "Unitario:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
             ax.text(0.25, 0.15, f"{vrm:,.0f} €/m²", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
-            
-            ax.text(0.48, 0.15, "Tipologias:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
+            ax.text(0.48, 0.15, "Tipologías:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
             ax.text(0.72, 0.15, f"{tipos}", fontsize=12, fontweight='bold', color='#121212', transform=ax.transAxes)
             
             img_buf = io.BytesIO()
@@ -176,7 +169,7 @@ def generate_zip_images(df, cols):
     return zip_buffer
 
 # --- LAYOUT DE COLUMNAS ---
-col_izq, col_mapa, col_der, col_ctrl = st.columns([1, 3.8, 1, 1.1])
+col_izq, col_mapa, col_der, col_ctrl = st.columns([1.1, 4, 1.1, 1.1])
 
 df_final = pd.DataFrame()
 ALTURA_CONTENEDOR = 820 
@@ -192,11 +185,11 @@ with col_ctrl:
             st.markdown("<p style='font-size:10px; font-weight:bold; margin-bottom:4px; margin-top:5px; color:#a0a0a0;'>MAPA</p>", unsafe_allow_html=True)
             c_map1, c_map2 = st.columns(2)
             with c_map1:
-                tipo_vista = st.selectbox("Vista", ["Callejero", "Satelite"], label_visibility="collapsed")
+                tipo_vista = st.selectbox("Vista", ["Callejero", "Satélite"], label_visibility="collapsed")
             with c_map2:
-                estilo_mapa = st.selectbox("Estilo", ["Estandar", "Escala de Grises", "Azul Oscuro"], label_visibility="collapsed")
+                estilo_mapa = st.selectbox("Estilo", ["Estándar", "Escala de Grises", "Azul Oscuro"], label_visibility="collapsed")
             
-            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            st.markdown("---")
             
             c_btn1, c_btn2 = st.columns(2)
             with c_btn1:
@@ -211,7 +204,7 @@ with col_ctrl:
             if st.button("Filtrar vista", use_container_width=True):
                 st.session_state.do_filter_view = True
 
-            st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+            st.markdown("---")
 
             df_raw, cols = load_data(file)
             if not df_raw.empty:
@@ -221,7 +214,7 @@ with col_ctrl:
                         return st.multiselect(lbl, opts, default=opts, key=f"{f_key}_{st.session_state.reset_key}")
                     return []
                 
-                f_tipo = mk_filter("Tipologia", cols['tipo'], "tipo")
+                f_tipo = mk_filter("Tipología", cols['tipo'], "tipo")
                 f_tier = mk_filter("Tier", cols['tier'], "tier")
                 f_zona = mk_filter("Zona", cols['zona'], "zona")
                 f_ciudad = mk_filter("Ciudad", cols['ciudad'], "ciudad")
@@ -283,7 +276,7 @@ with col_ctrl:
                             use_container_width=True
                         )
                     else:
-                        st.caption("Aviso: 'matplotlib' no detectado. Revisa requirements.txt para habilitar descargas.")
+                        st.caption("Falta 'matplotlib' en requirements.txt para descargar ZIP.")
 
                     st.markdown("---")
                     with st.expander(f"Ocultos ({len(df_ocultos)})"):
@@ -325,9 +318,8 @@ if file and not df_filtered.empty:
             </div>
         </div>"""
 
-        # Columnas ajustadas: 8% para el boton, 92% para la tarjeta (para que no deforme)
         if side == "left":
-            c_btn, c_card = st.columns([0.08, 0.92])
+            c_btn, c_card = st.columns([0.15, 0.85], vertical_alignment="center")
             with c_btn:
                 st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
                 if st.button("✕", key=f"hide_{ref_str}"):
@@ -337,7 +329,7 @@ if file and not df_filtered.empty:
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
         else:
-            c_card, c_btn = st.columns([0.92, 0.08])
+            c_card, c_btn = st.columns([0.85, 0.15], vertical_alignment="center")
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
             with c_btn:
@@ -347,7 +339,6 @@ if file and not df_filtered.empty:
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
-    # ALGORITMO DE ESPACIADO "EFECTO ACORDEON"
     TOTAL_CARDS = len(df_visible)
     MAX_LEFT_CAPACITY = 10
     
@@ -357,103 +348,82 @@ if file and not df_filtered.empty:
         mid = TOTAL_CARDS // 2 + (TOTAL_CARDS % 2)
         left_df, right_df = df_visible.iloc[:mid], df_visible.iloc[mid:]
 
-    def render_column_with_spacing(df_subset, side):
-        num_cards = len(df_subset)
-        if num_cards == 0: return
-        
-        # 72px es la altura real aproximada de la tarjeta en pantalla
-        espacio_sobrante = max(0, ALTURA_CONTENEDOR - (num_cards * 72))
-        gap = max(4, espacio_sobrante // (num_cards + 1)) 
-        
-        st.markdown(f"<div style='height:{gap}px;'></div>", unsafe_allow_html=True)
-        for _, row in df_subset.iterrows():
-            render_promo_card(row, side)
-            st.markdown(f"<div style='height:{gap}px;'></div>", unsafe_allow_html=True)
-
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            render_column_with_spacing(left_df, "left")
+            # Pintado directo, dejando a Streamlit respetar los márgenes CSS naturales
+            for _, row in left_df.iterrows():
+                render_promo_card(row, "left")
 
     with col_der:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            render_column_with_spacing(right_df, "right")
+            for _, row in right_df.iterrows():
+                render_promo_card(row, "right")
 
-    # MAPA CON CACHE (LA BALA DE PLATA ANTI-PARPADEO)
+    # MAPA NATIVO Y ESTABLE (Se recarga de forma normal, sin hacks que rompan la página)
     with col_mapa:
-        # Generamos una "llave" unica para saber si el mapa realmente necesita re-dibujarse
-        visible_refs = "-".join(sorted(df_visible[cols['ref']].astype(str).tolist()))
-        map_key = f"{visible_refs}_{estilo_mapa}_{tipo_vista}_{mostrar_etiquetas}"
-
-        # Si el mapa es nuevo, o han cambiado los filtros, reconstruimos el objeto Folium
-        if st.session_state.get('last_map_key') != map_key:
-            m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
+        m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
+        
+        if tipo_vista == "Callejero":
+            if estilo_mapa == "Estándar":
+                tiles_url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+            elif estilo_mapa == "Escala de Grises":
+                tiles_url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+            else: 
+                tiles_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
             
-            # Mapas CartoDB/Esri Limpios
-            if tipo_vista == "Callejero":
-                if estilo_mapa == "Estandar":
-                    tiles_url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-                elif estilo_mapa == "Escala de Grises":
-                    tiles_url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-                else: 
-                    tiles_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                folium.TileLayer(tiles=tiles_url, attr='CartoDB', name='Callejero', overlay=False).add_to(m)
-            else: # Satelite
-                folium.TileLayer(
-                    tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                    attr='Esri', name='Satelite Base', overlay=False
-                ).add_to(m)
-                folium.TileLayer(
-                    tiles='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
-                    attr='CartoDB', name='Etiquetas Limpias', overlay=True
-                ).add_to(m)
+            folium.TileLayer(tiles=tiles_url, attr='CartoDB', name='Callejero', overlay=False).add_to(m)
+            
+        else: # Satélite
+            folium.TileLayer(
+                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attr='Esri', name='Satélite Base', overlay=False
+            ).add_to(m)
+            folium.TileLayer(
+                tiles='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+                attr='CartoDB', name='Etiquetas Limpias', overlay=True
+            ).add_to(m)
 
-            if not df_visible.empty:
-                if not st.session_state.get('do_filter_view'):
-                    sw, ne = df_visible[['lat', 'lon']].min().values.tolist(), df_visible[['lat', 'lon']].max().values.tolist()
-                    m.fit_bounds([sw, ne])
+        if not df_visible.empty:
+            if not st.session_state.get('do_filter_view'):
+                sw, ne = df_visible[['lat', 'lon']].min().values.tolist(), df_visible[['lat', 'lon']].max().values.tolist()
+                m.fit_bounds([sw, ne])
+            
+            for i, row in df_visible.iterrows():
+                ref_str = str(row[cols['ref']])
+                val_vrm = row.get(cols['vrm'], 0)
                 
-                for i, row in df_visible.iterrows():
-                    ref_str = str(row[cols['ref']])
-                    val_vrm = row.get(cols['vrm'], 0)
-                    
-                    if mostrar_etiquetas:
-                        marker_html = f"""
-                        <div style="display: flex; align-items: center; drop-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: Arial, sans-serif;">
-                            <div style="background-color: #3a86ff; color: white; border-radius: 12px; min-width: 28px; height: 20px; 
-                                        display: flex; justify-content: center; align-items: center; font-size: 10px; 
-                                        font-weight: bold; border: 1.5px solid white; z-index: 2; padding: 0 4px;">
-                                {ref_str}
-                            </div>
-                            <div style="background-color: white; border: 1.5px solid #3a86ff; border-radius: 4px; 
-                                        padding: 1px 6px 1px 10px; margin-left: -8px; font-size: 10px; font-weight: bold; 
-                                        color: #121212; white-space: nowrap; z-index: 1;">
-                                {val_vrm:,.0f} €/m²
-                            </div>
+                if mostrar_etiquetas:
+                    marker_html = f"""
+                    <div style="display: flex; align-items: center; drop-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: Arial, sans-serif;">
+                        <div style="background-color: #3a86ff; color: white; border-radius: 12px; min-width: 28px; height: 20px; 
+                                    display: flex; justify-content: center; align-items: center; font-size: 10px; 
+                                    font-weight: bold; border: 1.5px solid white; z-index: 2; padding: 0 4px;">
+                            {ref_str}
                         </div>
-                        """
-                    else:
-                        marker_html = f"""
-                        <div style="drop-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: Arial, sans-serif;">
-                            <div style="background-color: #3a86ff; color: white; border-radius: 12px; min-width: 28px; height: 20px; 
-                                        display: flex; justify-content: center; align-items: center; font-size: 10px; 
-                                        font-weight: bold; border: 1.5px solid white; padding: 0 4px;">
-                                {ref_str}
-                            </div>
+                        <div style="background-color: white; border: 1.5px solid #3a86ff; border-radius: 4px; 
+                                    padding: 1px 6px 1px 10px; margin-left: -8px; font-size: 10px; font-weight: bold; 
+                                    color: #121212; white-space: nowrap; z-index: 1;">
+                            {val_vrm:,.0f} €/m²
                         </div>
-                        """
-                    
-                    folium.Marker(
-                        [row['lat'], row['lon']], 
-                        icon=folium.DivIcon(html=marker_html, icon_anchor=(14, 10))
-                    ).add_to(m)
+                    </div>
+                    """
+                else:
+                    marker_html = f"""
+                    <div style="drop-shadow: 0 2px 4px rgba(0,0,0,0.6); font-family: Arial, sans-serif;">
+                        <div style="background-color: #3a86ff; color: white; border-radius: 12px; min-width: 28px; height: 20px; 
+                                    display: flex; justify-content: center; align-items: center; font-size: 10px; 
+                                    font-weight: bold; border: 1.5px solid white; padding: 0 4px;">
+                            {ref_str}
+                        </div>
+                    </div>
+                    """
+                
+                folium.Marker(
+                    [row['lat'], row['lon']], 
+                    icon=folium.DivIcon(html=marker_html, icon_anchor=(14, 10))
+                ).add_to(m)
 
-            # Guardamos el mapa en memoria
-            st.session_state.map_obj = m
-            st.session_state.last_map_key = map_key
-
-        # Renderizamos siempre el mapa que esta en memoria. 
-        # Al mover el raton, Python detecta que es exactamente el mismo objeto y NO lo recarga, eliminando el pantallazo gris.
-        st_folium(st.session_state.map_obj, width="100%", height=ALTURA_CONTENEDOR, key="main_map", returned_objects=["bounds"])
+        st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map")
 
 else:
     with col_mapa:
@@ -465,7 +435,7 @@ else:
                 <h4 style="color: #ffffff; font-size: 16px; margin-top: 0; margin-bottom: 15px;">Instrucciones de Inicio:</h4>
                 <ol style="color: #e0e0e0; font-size: 14px; line-height: 1.8; margin-bottom: 0; padding-left: 20px;">
                     <li>Carga tu archivo Excel en el panel lateral derecho.</li>
-                    <li>El sistema procesara la pestana EEMM automaticamente.</li>
+                    <li>El sistema procesará la pestaña EEMM automáticamente.</li>
                     <li>Se requieren las columnas clave: COORD, REF, PVP y VRM SCIC.</li>
                     <li>Utiliza los filtros para segmentar el mercado en tiempo real.</li>
                 </ol>
