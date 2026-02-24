@@ -28,25 +28,22 @@ if 'do_filter_view' not in st.session_state:
 st.markdown("""
 <style>
 header[data-testid="stHeader"] { display: none !important; }
-.block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 99% !important; }
+.block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 98% !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
 p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin-bottom: 2px !important;}
 
-/* Forzar la reduccion del espacio nativo entre bloques de Streamlit */
-[data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
-
 /* Header */
 .app-header {
-    background-color: #1e1e1e; padding: 8px 20px; 
+    background-color: #1e1e1e; padding: 12px 20px; 
     border-bottom: 2px solid #3a86ff; border-radius: 6px;
-    margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;
 }
-.app-title { font-size: 16px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
+.app-title { font-size: 18px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas base (Tamano legible pero sin espacio exterior) */
+/* Tarjetas base con espaciado natural y sin solapamiento */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
-    padding: 8px 10px; margin-bottom: 0px !important; transition: all 0.2s;
+    padding: 8px 10px; margin-bottom: 8px !important; transition: all 0.2s;
     min-height: 65px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
@@ -63,34 +60,34 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 .promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.3 !important; }
 .promo-details b { color: #ffffff !important; }
 
-/* Filtros y Selectores (Expandibles para ver todos los tags) */
+/* Filtros Expandibles (Permiten ver todos los campos) */
 div[data-baseweb="select"] > div { 
     background-color: #252525 !important; border-color: #3a3a3a !important; 
-    min-height: 28px !important; padding: 2px 4px !important; 
+    min-height: 32px !important; height: auto !important; padding: 2px 4px !important; 
 }
 div[data-baseweb="select"] span { font-size: 11px !important; }
-span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 10px !important; padding: 2px 6px !important; height: auto !important; margin: 2px !important;}
-.stMultiSelect label { font-size: 11px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 2px !important;}
+span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 9px !important; padding: 2px 4px !important; height: 18px !important; margin: 2px !important;}
+.stMultiSelect label { font-size: 11px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 4px !important;}
 
 /* Botones Nativos Globales */
 div.stButton > button {
-    padding: 2px 4px !important; font-size: 10px !important; min-height: 24px !important;
+    padding: 2px 4px !important; font-size: 11px !important; min-height: 28px !important;
     background-color: transparent; border: 1px solid #3a3a3a; color: #a0a0a0; border-radius: 4px; display: flex; margin: auto;
 }
 div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-color: #1e1e1e; }
 
-/* Boton X Microscopico de la Tarjeta */
+/* Boton X Microscopico y plano */
 .btn-micro > div > button { 
-    height: 16px !important; width: 16px !important; min-height: 16px !important; 
-    font-size: 8px !important; border: none !important; padding: 0 !important; 
-    color: #555555 !important; background: transparent !important;
+    height: 24px !important; width: 24px !important; min-height: 24px !important; 
+    font-size: 12px !important; border: none !important; padding: 0 !important; 
+    color: #666666 !important; background: transparent !important; display: flex; align-items: center; justify-content: center;
 }
-.btn-micro > div > button:hover { color: #ff4d4d !important; }
+.btn-micro > div > button:hover { color: #ff4d4d !important; background-color: rgba(255,77,77,0.1) !important;}
 </style>
 """, unsafe_allow_html=True)
 
 # --- HEADER VISUAL ---
-st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:10px; color:#b0b0b0; margin:0;">Analisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:11px; color:#b0b0b0; margin:0;">Analisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
 
 # --- LOGICA DE DATOS Y EXPORTACION ---
 @st.cache_data
@@ -174,10 +171,10 @@ def generate_zip_images(df, cols):
     return zip_buffer
 
 # --- LAYOUT DE COLUMNAS ---
-col_izq, col_mapa, col_der, col_ctrl = st.columns([1, 4.2, 1, 1.1])
+col_izq, col_mapa, col_der, col_ctrl = st.columns([1.1, 4, 1.1, 1])
 
 df_final = pd.DataFrame()
-ALTURA_CONTENEDOR = 820 
+ALTURA_CONTENEDOR = 800 
 
 # --- PANEL DERECHO (CONTROL Y FILTROS) ---
 with col_ctrl:
@@ -187,7 +184,7 @@ with col_ctrl:
         if file:
             mostrar_etiquetas = st.toggle("Ver Precios", value=True)
             
-            st.markdown("<p style='font-size:9px; font-weight:bold; margin-bottom:0px; margin-top:5px; color:#a0a0a0;'>CONTROLES DE MAPA</p>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:10px; font-weight:bold; margin-bottom:4px; margin-top:5px; color:#a0a0a0;'>MAPA</p>", unsafe_allow_html=True)
             c_map1, c_map2 = st.columns(2)
             with c_map1:
                 tipo_vista = st.selectbox("Vista", ["Callejero", "Satelite"], label_visibility="collapsed")
@@ -271,7 +268,6 @@ with col_ctrl:
 
                     st.markdown("---")
                     
-                    # Generacion de ZIP protegida
                     if MATPLOTLIB_INSTALLED:
                         zip_data = generate_zip_images(df_visible, cols)
                         st.download_button(
@@ -282,7 +278,7 @@ with col_ctrl:
                             use_container_width=True
                         )
                     else:
-                        st.caption("Falta instalar 'matplotlib' para exportar a ZIP. Revisa requirements.txt.")
+                        st.caption("Falta 'matplotlib' en requirements.txt para descargar ZIP.")
 
                     st.markdown("---")
                     with st.expander(f"Ocultos ({len(df_ocultos)})"):
@@ -292,12 +288,9 @@ with col_ctrl:
                                 st.rerun()
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
-                                nombre_oculto = str(row.get(cols['nombre'], ref_oculta))
-                                if nombre_oculto.lower() in ['nan', 'none', '']: nombre_oculto = ref_oculta
-
-                                cx_card, cx_btn = st.columns([0.85, 0.15], vertical_alignment="center")
+                                cx_card, cx_btn = st.columns([0.80, 0.20], vertical_alignment="center")
                                 with cx_card:
-                                    st.markdown(f"<div style='background:#1e1e1e; padding:4px; border-radius:4px; margin-bottom:4px;'><span style='font-size:9px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span></div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='background:#1e1e1e; padding:4px; border-radius:4px; margin-bottom:4px;'><span style='font-size:10px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span></div>", unsafe_allow_html=True)
                                 with cx_btn:
                                     if st.button("V", key=f"res_{ref_oculta}"):
                                         st.session_state.hidden_promos.remove(ref_oculta)
@@ -324,23 +317,24 @@ if file and not df_filtered.empty:
             </div>
         </div>"""
 
+        # Reparto de anchos (15% para el boton, 85% para la tarjeta) para evitar deformaciones
         if side == "left":
-            c_btn, c_card = st.columns([0.08, 0.92], vertical_alignment="center")
+            c_btn, c_card = st.columns([0.15, 0.85], vertical_alignment="center")
             with c_btn:
                 st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
-                if st.button("X", key=f"hide_{ref_str}"):
+                if st.button("✕", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
         else:
-            c_card, c_btn = st.columns([0.92, 0.08], vertical_alignment="center")
+            c_card, c_btn = st.columns([0.85, 0.15], vertical_alignment="center")
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
             with c_btn:
                 st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
-                if st.button("X", key=f"hide_{ref_str}"):
+                if st.button("✕", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -364,10 +358,14 @@ if file and not df_filtered.empty:
             for _, row in right_df.iterrows():
                 render_promo_card(row, "right")
 
-    # MAPA CON CARTODB y ESRI
+    # MAPA CON CARTODB y ESRI (Optimizados)
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
+        # EL TRUCO PARA ELIMINAR EL PARPADEO GRIS:
+        # Inyectamos CSS al contenedor del mapa para que el color de fondo mientras carga sea oscuro (#121212)
+        m.get_root().html.add_child(folium.Element("<style>.leaflet-container { background: #121212 !important; }</style>"))
+
         if tipo_vista == "Callejero":
             if estilo_mapa == "Estandar":
                 tiles_url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
@@ -428,7 +426,9 @@ if file and not df_filtered.empty:
                     icon=folium.DivIcon(html=marker_html, icon_anchor=(14, 10))
                 ).add_to(m)
 
-        st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map")
+        # returned_objects=["bounds"] evita que el mapa mande datos a Streamlit cada milimetro que mueves el raton.
+        # Esto reduce dramaticamente los parpadeos y recargas innecesarias.
+        st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map", returned_objects=["bounds"])
 
 else:
     with col_mapa:
