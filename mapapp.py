@@ -2,55 +2,99 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
+import json
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
 
-# --- ESTILOS CSS TEMA OSCURO (Seguro para Streamlit) ---
+# --- ESTILOS CSS TEMA OSCURO ---
 CSS = """
 <style>
 header[data-testid="stHeader"] { display: none !important; }
 .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 98% !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
-p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; }
+p, h1, h2, h3, h4, h5, h6, label, span, div { color: #e0e0e0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
 
+/* Header Profesional Oscuro */
 .app-header {
     background-color: #1e1e1e; padding: 15px 25px; 
-    border-bottom: 2px solid #3a86ff; border-radius: 8px;
+    border-bottom: 3px solid #3a86ff; border-radius: 8px;
     margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
-.app-title { font-size: 20px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
+.app-title { font-size: 22px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; letter-spacing: 0.5px; }
 
+/* Tarjetas de Promoción */
 .promo-card {
-    background-color: #2d2d2d; border: 1px solid #404040; border-radius: 6px;
-    padding: 12px; margin-bottom: 10px; transition: 0.2s;
+    background-color: #252525; border: 1px solid #3a3a3a; border-radius: 8px;
+    padding: 12px; margin-bottom: 10px; transition: all 0.2s ease-in-out;
 }
-.promo-card:hover { border-color: #3a86ff; }
+.promo-card:hover { border-color: #3a86ff; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(58, 134, 255, 0.2); }
 .promo-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .promo-circle {
-    background-color: #3a86ff; color: white; border-radius: 50%;
-    width: 24px; height: 24px; display: flex; justify-content: center;
-    align-items: center; font-size: 11px; font-weight: bold; flex-shrink: 0;
+    background: linear-gradient(135deg, #3a86ff, #0056b3); color: white; border-radius: 50%;
+    width: 26px; height: 26px; display: flex; justify-content: center;
+    align-items: center; font-size: 12px; font-weight: bold; flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2);
 }
 .promo-name { font-weight: 700 !important; color: #ffffff !important; font-size: 13px !important; margin: 0 !important; }
-.promo-details { font-size: 11px !important; color: #a0a0a0 !important; line-height: 1.5 !important; }
-.promo-details b { color: #ffffff !important; }
+.promo-details { font-size: 11px !important; color: #b0b0b0 !important; line-height: 1.6 !important; }
+.promo-details b { color: #ffffff !important; font-weight: 600; }
 
-.map-label {
-    background: #2d2d2d !important; border: 1px solid #3a86ff !important;
-    border-radius: 4px !important; padding: 4px 8px !important;
-    font-size: 11px !important; font-weight: bold !important;
-    color: #ffffff !important; white-space: nowrap !important;
+/* ETIQUETAS DEL MAPA MEJORADAS (Visibles sobre cualquier fondo) */
+.map-label-container {
+    background-color: #ffffff !important;
+    border: 2px solid #3a86ff !important;
+    border-radius: 6px !important;
+    padding: 4px 8px !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4) !important;
+    white-space: nowrap !important;
+    font-family: 'Helvetica Neue', Arial, sans-serif !important;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.map-label-price {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    color: #121212 !important; /* Texto oscuro para contraste */
+}
+.map-label-unit {
+    font-size: 9px !important;
+    font-weight: 600 !important;
+    color: #555555 !important;
+    margin-top: -2px;
 }
 
-div[data-baseweb="select"] > div { background-color: #2d2d2d !important; border-color: #404040 !important; color: white !important;}
-div[data-baseweb="tag"] { background-color: #3a86ff !important; }
+/* Ajustes de Filtros Streamlit */
+div[data-baseweb="select"] > div { background-color: #252525 !important; border-color: #3a3a3a !important; color: white !important;}
+div[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; border: none; }
+.stMultiSelect label { color: #e0e0e0 !important; font-weight: 600; font-size: 12px; }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
 # --- HEADER VISUAL ---
-st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:12px; color:#a0a0a0; margin:0;">Análisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:12px; color:#b0b0b0; margin:0; font-weight: 500;">Análisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
+
+# --- ESTILO DE MAPA GOOGLE SIN COMERCIOS ---
+# JSON de estilo para ocultar puntos de interés comerciales y rotular transporte
+google_map_style = [
+    {"featureType": "poi", "elementType": "labels", "stylers": [{"visibility": "off"}]},
+    {"featureType": "poi.business", "stylers": [{"visibility": "off"}]},
+    {"featureType": "poi.attraction", "stylers": [{"visibility": "off"}]},
+    {"featureType": "poi.medical", "stylers": [{"visibility": "off"}]},
+    {"featureType": "poi.school", "stylers": [{"visibility": "off"}]},
+    {"featureType": "transit.station", "elementType": "labels.icon", "stylers": [{"visibility": "on"}]},
+    {"featureType": "road.highway", "elementType": "geometry", "stylers": [{"color": "#ffffff"}]},
+    {"featureType": "road.arterial", "elementType": "geometry", "stylers": [{"color": "#ffffff"}]},
+]
+encoded_style = requests.utils.quote(json.dumps(google_map_style)) if 'requests' in locals() else ""
+# Nota: Para codificar la URL del estilo se necesita 'requests'. 
+# Como alternativa simple, usaremos una cadena pre-codificada para un estilo limpio común.
+# Esta es una cadena de estilo de Google Maps que oculta POIs.
+STYLE_STRING = "s.e%3Al%7Cp.v%3Aoff%2Cs.t%3A3%7Cs.e%3Ag%7Cp.c%3A%23ffffff%2Cs.t%3A2%7Cs.e%3Ag%7Cp.c%3A%23ffffff"
+
 
 # --- LÓGICA DE DATOS ---
 @st.cache_data
@@ -137,8 +181,9 @@ if file and not df_final.empty:
             <div class="promo-card">
                 <div class="promo-header"><div class="promo-circle">{start_idx+i+1}</div><p class="promo-name">{row[cols['ref']]}</p></div>
                 <div class="promo-details">
-                    <b>Uds:</b> {row['UDS']} | <b>PVP m:</b> <b>{row.get(cols['pvp'], 0):,.0f}€</b><br>
-                    <b>Unit:</b> <b>{row.get(cols['vrm'], 0):,.0f} €/m²</b> | <b>Tip:</b> {row.get(cols['dorm'], 'N/A')}D
+                    Uds: <b>{row['UDS']}</b> | PVP med: <b>{row.get(cols['pvp'], 0):,.0f}€</b><br>
+                    Unitario: <b>{row.get(cols['vrm'], 0):,.0f} €/m²</b><br>
+                    Tipologías: {row.get(cols['dorm'], 'N/A')}D
                 </div>
             </div>""", unsafe_allow_html=True)
 
@@ -151,30 +196,51 @@ if file and not df_final.empty:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
             render_promo_cards(df_promo.iloc[mid:], mid)
 
-    # Generar Mapa (Modo Oscuro)
+    # Generar Mapa (Con Estilos Limpios de Google)
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=True)
         
+        # Capa Híbrida Limpia (Satélite + Calles sin comercios)
+        # Usamos 'lyrs=y' para híbrido y aplicamos el estilo para ocultar POIs
         folium.TileLayer(
-            tiles='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-            attr='&copy; OpenStreetMap contributors &copy; CARTO',
-            name='Modo Oscuro',
-            subdomains='abcd'
+            tiles=f"https://mt1.google.com/vt/lyrs=y&x={{x}}&y={{y}}&z={{z}}&apistyle={STYLE_STRING}",
+            attr="Google",
+            name="Satélite Limpio",
+            overlay=False,
+            control=True
         ).add_to(m)
-        
-        folium.TileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", attr="Google", name="Satélite").add_to(m)
+
+        # Capa Callejero Limpio (Solo carreteras y transporte)
+        # Usamos 'lyrs=m' para mapa estándar y aplicamos el estilo
+        folium.TileLayer(
+            tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&apistyle={STYLE_STRING}",
+            attr="Google",
+            name="Callejero Limpio",
+            overlay=False,
+            control=True
+        ).add_to(m)
 
         sw, ne = df_promo[['lat', 'lon']].min().values.tolist(), df_promo[['lat', 'lon']].max().values.tolist()
         m.fit_bounds([sw, ne])
         
         for i, row in df_promo.iterrows():
+            # Marcador circular numerado (Más vibrante)
             folium.Marker([row['lat'], row['lon']], 
-                icon=folium.DivIcon(html=f'<div class="promo-circle" style="width:26px; height:26px; border: 2px solid #121212;">{i+1}</div>')
+                icon=folium.DivIcon(html=f'<div class="promo-circle">{i+1}</div>'),
+                z_index_offset=1000 # Asegura que el círculo esté sobre la etiqueta
             ).add_to(m)
             
+            # Etiqueta de Precio Unitario (Recuadro blanco con texto oscuro)
             val_vrm = row.get(cols['vrm'], 0)
+            label_html = f"""
+            <div class="map-label-container">
+                <span class="map-label-price">{val_vrm:,.0f} €/m²</span>
+                <span class="map-label-unit">Precio Unitario</span>
+            </div>
+            """
             folium.Marker([row['lat'], row['lon']], 
-                icon=folium.DivIcon(html=f'<div class="map-label">{val_vrm:,.0f} €/m²</div>', icon_anchor=(-15, 12))
+                icon=folium.DivIcon(html=label_html, icon_anchor=(-18, 20)), # Posición ajustada
+                z_index_offset=900
             ).add_to(m)
 
         folium.LayerControl(position='topright').add_to(m)
@@ -187,7 +253,7 @@ else:
         <div style="background-color: #1e1e1e; padding: 60px 40px; border-radius: 12px; text-align: center; border-top: 4px solid #3a86ff; margin-top: 80px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
             <h1 style="color: #ffffff; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 10px;">ESTUDIO DE MERCADO PRO</h1>
             <h4 style="color: #a0a0a0; font-weight: 300; margin-bottom: 40px;">Plataforma de Inteligencia Inmobiliaria</h4>
-            <div style="background-color: #2d2d2d; padding: 25px; border-radius: 8px; text-align: left; display: inline-block; width: 100%; max-width: 500px; border: 1px solid #404040;">
+            <div style="background-color: #252525; padding: 25px; border-radius: 8px; text-align: left; display: inline-block; width: 100%; max-width: 500px; border: 1px solid #3a3a3a;">
                 <h4 style="color: #ffffff; font-size: 16px; margin-top: 0; margin-bottom: 15px;">Instrucciones de Inicio:</h4>
                 <ol style="color: #e0e0e0; font-size: 14px; line-height: 1.8; margin-bottom: 0; padding-left: 20px;">
                     <li>Carga tu archivo Excel en el panel lateral derecho.</li>
