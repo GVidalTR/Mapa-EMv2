@@ -34,35 +34,35 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 16px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas base (El espaciado lo controla Python dinamicamente) */
+/* Tarjetas base (Totalmente compactadas) */
 .promo-card {
-    background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
-    padding: 8px 10px; margin-bottom: 0px !important; transition: all 0.2s;
-    min-height: 72px; display: flex; flex-direction: column; justify-content: center; position: relative;
+    background-color: #252525; border: 1px solid #3a3a3a; border-radius: 4px;
+    padding: 6px 8px; margin-bottom: 2px !important; transition: all 0.2s;
+    min-height: 60px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
-.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 15px;}
+.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; padding-right: 15px;}
 .promo-pill-ui {
-    background-color: #3a86ff; color: white; border-radius: 10px;
-    min-width: 26px; height: 18px; display: flex; justify-content: center;
-    align-items: center; font-size: 10px; font-weight: bold; flex-shrink: 0; padding: 0 5px;
+    background-color: #3a86ff; color: white; border-radius: 8px;
+    min-width: 24px; height: 16px; display: flex; justify-content: center;
+    align-items: center; font-size: 9px; font-weight: bold; flex-shrink: 0; padding: 0 4px;
 }
 .promo-name { 
-    font-weight: 700 !important; color: #ffffff !important; font-size: 11px !important; margin: 0 !important; 
+    font-weight: 700 !important; color: #ffffff !important; font-size: 10px !important; margin: 0 !important; 
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
 }
-.promo-details { font-size: 10px !important; color: #b0b0b0 !important; line-height: 1.3 !important; }
+.promo-details { font-size: 9px !important; color: #b0b0b0 !important; line-height: 1.2 !important; }
 .promo-details b { color: #ffffff !important; }
 
 /* Filtros y Selectores Minimizados al Extremo */
 div[data-baseweb="select"] > div { 
     background-color: #252525 !important; border-color: #3a3a3a !important; 
-    min-height: 24px !important; height: 24px !important; 
+    min-height: 22px !important; height: 22px !important; 
     padding-top: 0px !important; padding-bottom: 0px !important; 
 }
 div[data-baseweb="select"] span { font-size: 10px !important; }
-span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 9px !important; padding: 2px 4px !important; height: 16px !important; margin: 1px !important;}
-.stMultiSelect label { font-size: 10px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 0px !important;}
+span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 8px !important; padding: 1px 3px !important; height: 16px !important; margin: 1px !important;}
+.stMultiSelect label { font-size: 9px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 0px !important;}
 
 /* Botones Nativos Streamlit */
 div.stButton > button {
@@ -131,15 +131,12 @@ def generate_zip_images(df, cols):
             vrm = row.get(cols['vrm'], 0)
             tipos = row.get(cols['dorm'], 'N/A')
             
-            # Lienzo ajustado para que quepa todo sin pisarse
             fig, ax = plt.subplots(figsize=(5.6, 1.8), dpi=200)
             ax.axis('off')
             
-            # Fondo blanco y borde
             ax.add_patch(plt.Rectangle((0, 0), 1, 1, facecolor='#ffffff', edgecolor='#cccccc', linewidth=2, transform=ax.transAxes))
             ax.add_patch(plt.Rectangle((0, 0), 0.02, 1, facecolor='#3a86ff', transform=ax.transAxes))
             
-            # Textos re-distribuidos
             ax.text(0.05, 0.72, f"{ref} - {nombre}", fontsize=14, fontweight='heavy', color='#003366', transform=ax.transAxes)
             
             ax.text(0.05, 0.40, "Unidades:", fontsize=11, fontweight='bold', color='#666666', transform=ax.transAxes)
@@ -183,7 +180,7 @@ with col_ctrl:
             with c_map1:
                 tipo_vista = st.selectbox("Vista", ["Callejero", "Satelite"], label_visibility="collapsed")
             with c_map2:
-                estilo_mapa = st.selectbox("Estilo", ["Estandar", "Escala de Grises", "Azul Plano"], label_visibility="collapsed")
+                estilo_mapa = st.selectbox("Estilo", ["Estandar", "Escala de Grises", "Azul Oscuro"], label_visibility="collapsed")
             
             st.markdown("---")
             
@@ -332,7 +329,6 @@ if file and not df_filtered.empty:
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
-    # ALGORITMO DE ESPACIADO DINAMICO "EFECTO MUELLE"
     TOTAL_CARDS = len(df_visible)
     MAX_LEFT_CAPACITY = 10
     
@@ -342,45 +338,40 @@ if file and not df_filtered.empty:
         mid = TOTAL_CARDS // 2 + (TOTAL_CARDS % 2)
         left_df, right_df = df_visible.iloc[:mid], df_visible.iloc[mid:]
 
-    def render_column_with_spacing(df_subset, side):
-        num_cards = len(df_subset)
-        if num_cards == 0: return
-        
-        # Calculo matematico para repartir el espacio vacio sobrante
-        # 75px es la altura aproximada de una tarjeta con su boton
-        espacio_sobrante = max(0, ALTURA_CONTENEDOR - (num_cards * 75))
-        gap = max(4, espacio_sobrante // (num_cards + 1)) 
-        
-        st.markdown(f"<div style='height:{gap}px;'></div>", unsafe_allow_html=True)
-        for _, row in df_subset.iterrows():
-            render_promo_card(row, side)
-            st.markdown(f"<div style='height:{gap}px;'></div>", unsafe_allow_html=True)
-
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            render_column_with_spacing(left_df, "left")
+            for _, row in left_df.iterrows():
+                render_promo_card(row, "left")
 
     with col_der:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            render_column_with_spacing(right_df, "right")
+            for _, row in right_df.iterrows():
+                render_promo_card(row, "right")
 
     # MAPA
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
-        # Estilos Nativos de Google Maps (Elimina el parpadeo porque no usa CSS)
-        estilos_google = {
-            "Estandar": "s.t%3A3%7Cp.v%3Aoff",
-            "Escala de Grises": "s.t%3Aall%7Cp.s%3A-100%2Cs.t%3A3%7Cp.v%3Aoff",
-            "Azul Plano": "s.e%3Ag%7Cp.c%3A%231b3a57%2Cs.t%3Aw%7Cs.e%3Ag%7Cp.c%3A%230d233a%2Cs.e%3Al.t.f%7Cp.c%3A%23ffffff%2Cs.e%3Al.t.s%7Cp.c%3A%23000000%2Cs.t%3A3%7Cp.v%3Aoff"
-        }
-        estilo_seleccionado = estilos_google[estilo_mapa]
-        tipo_lyrs = "y" if tipo_vista == "Satelite" else "m"
-
-        folium.TileLayer(
-            tiles=f"https://mt1.google.com/vt/lyrs={tipo_lyrs}&x={{x}}&y={{y}}&z={{z}}&apistyle={estilo_seleccionado}",
-            attr="Google", name=tipo_vista, control=False
-        ).add_to(m)
+        # Volvemos a CartoDB y Esri: Limpio, rapido y sin negocios
+        if tipo_vista == "Callejero":
+            if estilo_mapa == "Estandar":
+                tiles_url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+            elif estilo_mapa == "Escala de Grises":
+                tiles_url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+            else: # Azul Oscuro
+                tiles_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            
+            folium.TileLayer(tiles=tiles_url, attr='CartoDB', name='Callejero', overlay=False).add_to(m)
+            
+        else: # Satelite
+            folium.TileLayer(
+                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attr='Esri', name='Satelite Base', overlay=False
+            ).add_to(m)
+            folium.TileLayer(
+                tiles='https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+                attr='CartoDB', name='Etiquetas Limpias', overlay=True
+            ).add_to(m)
 
         if not df_visible.empty:
             if not st.session_state.get('do_filter_view'):
