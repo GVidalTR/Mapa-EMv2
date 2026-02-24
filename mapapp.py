@@ -6,27 +6,48 @@ from streamlit_folium import st_folium
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
 
-# --- ESTILOS CSS COMPRIMIDOS (SEGURO PARA GITHUB) ---
-st.markdown("""
+# --- ESTILOS CSS TEMA OSCURO (Seguro para Streamlit) ---
+CSS = """
 <style>
 header[data-testid="stHeader"] { display: none !important; }
 .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 98% !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
 p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; }
-.app-header { background-color: #1e1e1e; padding: 15px 25px; border-bottom: 2px solid #3a86ff; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+
+.app-header {
+    background-color: #1e1e1e; padding: 15px 25px; 
+    border-bottom: 2px solid #3a86ff; border-radius: 8px;
+    margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;
+}
 .app-title { font-size: 20px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
-.promo-card { background-color: #2d2d2d; border: 1px solid #404040; border-radius: 6px; padding: 12px; margin-bottom: 10px; transition: 0.2s; }
+
+.promo-card {
+    background-color: #2d2d2d; border: 1px solid #404040; border-radius: 6px;
+    padding: 12px; margin-bottom: 10px; transition: 0.2s;
+}
 .promo-card:hover { border-color: #3a86ff; }
 .promo-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.promo-circle { background-color: #3a86ff; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; justify-content: center; align-items: center; font-size: 11px; font-weight: bold; flex-shrink: 0; }
+.promo-circle {
+    background-color: #3a86ff; color: white; border-radius: 50%;
+    width: 24px; height: 24px; display: flex; justify-content: center;
+    align-items: center; font-size: 11px; font-weight: bold; flex-shrink: 0;
+}
 .promo-name { font-weight: 700 !important; color: #ffffff !important; font-size: 13px !important; margin: 0 !important; }
 .promo-details { font-size: 11px !important; color: #a0a0a0 !important; line-height: 1.5 !important; }
 .promo-details b { color: #ffffff !important; }
-.map-label { background: #2d2d2d !important; border: 1px solid #3a86ff !important; border-radius: 4px !important; padding: 4px 8px !important; font-size: 11px !important; font-weight: bold !important; color: #ffffff !important; white-space: nowrap !important; }
+
+.map-label {
+    background: #2d2d2d !important; border: 1px solid #3a86ff !important;
+    border-radius: 4px !important; padding: 4px 8px !important;
+    font-size: 11px !important; font-weight: bold !important;
+    color: #ffffff !important; white-space: nowrap !important;
+}
+
 div[data-baseweb="select"] > div { background-color: #2d2d2d !important; border-color: #404040 !important; color: white !important;}
 div[data-baseweb="tag"] { background-color: #3a86ff !important; }
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(CSS, unsafe_allow_html=True)
 
 # --- HEADER VISUAL ---
 st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:12px; color:#a0a0a0; margin:0;">Análisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
@@ -175,3 +196,5 @@ else:
                     <li>Utiliza los filtros para segmentar el mercado en tiempo real.</li>
                 </ol>
             </div>
+        </div>
+        """, unsafe_allow_html=True)
