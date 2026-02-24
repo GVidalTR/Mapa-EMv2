@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
+import streamlit.components.v1 as components
 
 # --- CONFIGURACIÓN DE PÁGINA Y MEMORIA ---
 st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_sidebar_state="collapsed")
@@ -9,7 +10,7 @@ st.set_page_config(page_title="Estudio de Mercado Pro", layout="wide", initial_s
 if 'hidden_promos' not in st.session_state:
     st.session_state.hidden_promos = set()
 
-# --- ESTILOS CSS TEMA OSCURO ---
+# --- ESTILOS CSS AVANZADOS Y MODO IMPRESIÓN ---
 st.markdown("""
 <style>
 header[data-testid="stHeader"] { display: none !important; }
@@ -25,14 +26,14 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 16px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas de Promoción Compactas y Flexibles */
+/* Tarjetas Flexibles y Botón X Microscópico */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
     padding: 8px 10px; margin-bottom: 4px; transition: all 0.2s;
-    min-height: 70px; display: flex; flex-direction: column; justify-content: center;
+    min-height: 70px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
-.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.promo-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 15px;}
 .promo-pill-ui {
     background-color: #3a86ff; color: white; border-radius: 10px;
     min-width: 26px; height: 18px; display: flex; justify-content: center;
@@ -50,19 +51,41 @@ div[data-baseweb="select"] > div { background-color: #252525 !important; border-
 span[data-baseweb="tag"] { background-color: #3a86ff !important; color: white !important; font-size: 9px !important; padding: 2px 4px !important; height: 18px !important; margin: 2px !important;}
 .stMultiSelect label { font-size: 10px !important; font-weight: bold !important; color: #a0a0a0 !important; padding-bottom: 0px !important;}
 
-/* Estilo Botones Discretos (Cruz y Tick) */
+/* Botones Nativos Streamlit (Minimizados al máximo) */
 div.stButton > button {
-    height: 20px; width: 20px; padding: 0px !important; font-size: 10px !important; 
-    background-color: transparent; border: 1px solid #3a3a3a; color: #666666; border-radius: 4px; display: flex; margin: auto;
+    height: 18px; width: 18px; padding: 0px !important; font-size: 9px !important; 
+    background-color: transparent; border: none; color: #555555; border-radius: 3px; display: flex; margin: auto;
 }
-div.stButton > button:hover { border-color: #ff4d4d; color: #ff4d4d; background-color: #1e1e1e; }
+div.stButton > button:hover { color: #ff4d4d; background-color: rgba(255,77,77,0.1); }
+
+/* Botón Exportar */
+.btn-export {
+    background-color: #3a86ff; color: white !important; padding: 6px 12px; border-radius: 4px;
+    text-decoration: none; font-size: 11px; font-weight: bold; display: inline-block; width: 100%; text-align: center;
+    border: 1px solid #2a66cc; transition: 0.2s; cursor: pointer;
+}
+.btn-export:hover { background-color: #2a66cc; }
+
+/* MODO IMPRESIÓN (Oculta controles y deja solo mapa y tarjetas) */
+@media print {
+    [data-testid="stSidebar"], .stFileUploader, [data-testid="stExpander"], .btn-export, div.stButton { display: none !important; }
+    .block-container { max-width: 100% !important; padding: 0 !important; }
+    .promo-card { border: 1px solid #ccc !important; background-color: white !important; }
+    p, span, .promo-details, .promo-name { color: black !important; }
+    .app-header { background-color: white !important; border-bottom: 2px solid #ccc !important; color: black !important; }
+    .app-title { color: black !important; }
+}
 </style>
+
+<script>
+function printDashboard() { window.parent.print(); }
+</script>
 """, unsafe_allow_html=True)
 
 # --- HEADER VISUAL ---
 st.markdown('<div class="app-header"><p class="app-title">ESTUDIO DE MERCADO PRO</p><p style="font-size:10px; color:#b0b0b0; margin:0;">Análisis de Entorno & Pricing</p></div>', unsafe_allow_html=True)
 
-# --- LÓGICA DE DATOS Y LIMPIEZA ---
+# --- LÓGICA DE DATOS ---
 @st.cache_data
 def load_data(file):
     try:
@@ -102,7 +125,7 @@ def clean_dorm(x):
     return "-".join(sorted(list(items)))
 
 # --- LAYOUT DE COLUMNAS ---
-col_izq, col_mapa, col_der, col_ctrl = st.columns([1.1, 3.5, 1.1, 0.9])
+col_izq, col_mapa, col_der, col_ctrl = st.columns([1, 3.8, 1, 0.9])
 
 df_final = pd.DataFrame()
 ALTURA_CONTENEDOR = 820 
@@ -110,9 +133,16 @@ ALTURA_CONTENEDOR = 820
 # --- PANEL DERECHO (CONTROL Y FILTROS) ---
 with col_ctrl:
     with st.container(height=ALTURA_CONTENEDOR, border=False):
+        # Botón Exportar PDF/Vista
+        st.markdown("<a href='javascript:window.parent.print()' class='btn-export'>Exportar Vista</a>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
         file = st.file_uploader("Subir Excel", type=['xlsx'], label_visibility="collapsed")
         
-        mostrar_etiquetas = st.toggle("Mostrar Etiquetas Precio", value=True)
+        st.markdown("---")
+        mostrar_etiquetas = st.toggle("Ver Precios", value=True)
+        estilo_mapa = st.selectbox("Estilo Mapa", ["Estándar", "Escala de Grises", "Azul Oscuro"])
+        st.markdown("---")
         
         if file:
             df_raw, cols = load_data(file)
@@ -158,12 +188,11 @@ with col_ctrl:
                     df_ocultos = df_promo[df_promo[cols['ref']].astype(str).isin(st.session_state.hidden_promos)]
 
                     st.markdown("---")
-                    with st.expander(f"📦 Ocultos ({len(df_ocultos)})"):
+                    with st.expander(f"Ocultos ({len(df_ocultos)})"):
                         if not df_ocultos.empty:
                             if st.button("Restaurar Todos", use_container_width=True):
                                 st.session_state.hidden_promos.clear()
                                 st.rerun()
-                            
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
                                 nombre_oculto = str(row.get(cols['nombre'], ref_oculta))
@@ -171,9 +200,9 @@ with col_ctrl:
 
                                 cx_card, cx_btn = st.columns([0.85, 0.15], vertical_alignment="center")
                                 with cx_card:
-                                    st.markdown(f"<div style='background:#1e1e1e; padding:5px; border-radius:4px; margin-bottom:4px;'><span style='font-size:10px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span> <span style='font-size:10px; color:#aaa;'>{nombre_oculto[:15]}...</span></div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='background:#1e1e1e; padding:5px; border-radius:4px; margin-bottom:4px;'><span style='font-size:10px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span> <span style='font-size:10px; color:#aaa;'>{nombre_oculto[:12]}...</span></div>", unsafe_allow_html=True)
                                 with cx_btn:
-                                    if st.button("✓", key=f"res_{ref_oculta}", help="Restaurar"):
+                                    if st.button("V", key=f"res_{ref_oculta}"):
                                         st.session_state.hidden_promos.remove(ref_oculta)
                                         st.rerun()
                         else:
@@ -200,11 +229,10 @@ if file and not df_filtered.empty:
             </div>
         </div>"""
 
-        # Colocación dinámica del botón "X" en los extremos
         if side == "left":
             c_btn, c_card = st.columns([0.1, 0.9], vertical_alignment="center")
             with c_btn:
-                if st.button("✕", key=f"hide_{ref_str}"):
+                if st.button("X", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
             with c_card:
@@ -214,33 +242,47 @@ if file and not df_filtered.empty:
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
             with c_btn:
-                if st.button("✕", key=f"hide_{ref_str}"):
+                if st.button("X", key=f"hide_{ref_str}"):
                     st.session_state.hidden_promos.add(ref_str)
                     st.rerun()
 
-    mid = len(df_visible) // 2
+    # LÓGICA DE REPARTO INTELIGENTE DE TARJETAS
+    TOTAL_CARDS = len(df_visible)
+    MAX_LEFT_CAPACITY = 10 # Si hay 10 o menos, van todas a la izquierda
+
     with col_izq:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            for _, row in df_visible.iloc[:mid].iterrows(): 
-                render_promo_card(row, side="left")
+            if TOTAL_CARDS <= MAX_LEFT_CAPACITY:
+                for _, row in df_visible.iterrows(): render_promo_card(row, side="left")
+            else:
+                mid = TOTAL_CARDS // 2 + (TOTAL_CARDS % 2) # Da prioridad a la izquierda si es impar
+                for _, row in df_visible.iloc[:mid].iterrows(): render_promo_card(row, side="left")
 
     with col_der:
         with st.container(height=ALTURA_CONTENEDOR, border=False):
-            for _, row in df_visible.iloc[mid:].iterrows(): 
-                render_promo_card(row, side="right")
+            if TOTAL_CARDS > MAX_LEFT_CAPACITY:
+                mid = TOTAL_CARDS // 2 + (TOTAL_CARDS % 2)
+                for _, row in df_visible.iloc[mid:].iterrows(): render_promo_card(row, side="right")
 
-    # Generar Mapa
+    # Generar Mapa con Selector de Estilos
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=True)
-        NO_POI_STYLE = "s.t%3A3%7Cp.v%3Aoff"
+        
+        # Diccionario de estilos URL de Google (siempre sin POIs)
+        estilos_google = {
+            "Estándar": "s.t%3A3%7Cp.v%3Aoff",
+            "Escala de Grises": "s.t%3Aall%7Cp.s%3A-100%2Cs.t%3A3%7Cp.v%3Aoff",
+            "Azul Oscuro": "s.t%3Aall%7Cs.e%3Ag%7Cp.c%3A%2315202b%2Cs.t%3Aall%7Cs.e%3Al.t.f%7Cp.c%3A%23ffffff%2Cs.t%3A3%7Cp.v%3Aoff"
+        }
+        estilo_seleccionado = estilos_google[estilo_mapa]
 
         folium.TileLayer(
-            tiles=f"https://mt1.google.com/vt/lyrs=y&x={{x}}&y={{y}}&z={{z}}&apistyle={NO_POI_STYLE}",
+            tiles=f"https://mt1.google.com/vt/lyrs=y&x={{x}}&y={{y}}&z={{z}}&apistyle={estilo_seleccionado}",
             attr="Google", name="Satélite", control=True
         ).add_to(m)
 
         folium.TileLayer(
-            tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&apistyle={NO_POI_STYLE}",
+            tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&apistyle={estilo_seleccionado}",
             attr="Google", name="Callejero", control=True
         ).add_to(m)
 
