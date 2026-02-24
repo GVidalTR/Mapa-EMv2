@@ -32,6 +32,9 @@ header[data-testid="stHeader"] { display: none !important; }
 [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
 p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin-bottom: 2px !important;}
 
+/* Forzar la reduccion del espacio nativo entre bloques para que se apilen bien */
+[data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
+
 /* Header */
 .app-header {
     background-color: #1e1e1e; padding: 12px 20px; 
@@ -40,10 +43,10 @@ p, h1, h2, h3, h4, h5, h6, label, span { color: #e0e0e0 !important; font-family:
 }
 .app-title { font-size: 18px !important; font-weight: 800 !important; margin: 0 !important; color: #ffffff !important; }
 
-/* Tarjetas base con espaciado natural y sin solapamiento */
+/* Tarjetas base apiladas y sin espacio sobrante */
 .promo-card {
     background-color: #252525; border: 1px solid #3a3a3a; border-radius: 6px;
-    padding: 8px 10px; margin-bottom: 8px !important; transition: all 0.2s;
+    padding: 8px 10px; margin-bottom: 4px !important; margin-top: 2px !important; transition: all 0.2s;
     min-height: 65px; display: flex; flex-direction: column; justify-content: center; position: relative;
 }
 .promo-card:hover { border-color: #3a86ff; }
@@ -79,8 +82,8 @@ div.stButton > button:hover { border-color: #3a86ff; color: #ffffff; background-
 /* Boton X Microscopico y plano */
 .btn-micro > div > button { 
     height: 24px !important; width: 24px !important; min-height: 24px !important; 
-    font-size: 12px !important; border: none !important; padding: 0 !important; 
-    color: #666666 !important; background: transparent !important; display: flex; align-items: center; justify-content: center;
+    font-size: 10px !important; border: none !important; padding: 0 !important; 
+    color: #555555 !important; background: transparent !important; display: flex; align-items: center; justify-content: center;
 }
 .btn-micro > div > button:hover { color: #ff4d4d !important; background-color: rgba(255,77,77,0.1) !important;}
 </style>
@@ -185,11 +188,7 @@ with col_ctrl:
             mostrar_etiquetas = st.toggle("Ver Precios", value=True)
             
             st.markdown("<p style='font-size:10px; font-weight:bold; margin-bottom:4px; margin-top:5px; color:#a0a0a0;'>MAPA</p>", unsafe_allow_html=True)
-            c_map1, c_map2 = st.columns(2)
-            with c_map1:
-                tipo_vista = st.selectbox("Vista", ["Callejero", "Satelite"], label_visibility="collapsed")
-            with c_map2:
-                estilo_mapa = st.selectbox("Estilo", ["Estandar", "Escala de Grises", "Azul Oscuro"], label_visibility="collapsed")
+            tipo_vista = st.selectbox("Vista", ["Callejero", "Satelite"], label_visibility="collapsed")
             
             st.markdown("---")
             
@@ -288,6 +287,9 @@ with col_ctrl:
                                 st.rerun()
                             for _, row in df_ocultos.iterrows():
                                 ref_oculta = str(row[cols['ref']])
+                                nombre_oculto = str(row.get(cols['nombre'], ref_oculta))
+                                if nombre_oculto.lower() in ['nan', 'none', '']: nombre_oculto = ref_oculta
+
                                 cx_card, cx_btn = st.columns([0.80, 0.20], vertical_alignment="center")
                                 with cx_card:
                                     st.markdown(f"<div style='background:#1e1e1e; padding:4px; border-radius:4px; margin-bottom:4px;'><span style='font-size:10px; color:#3a86ff; font-weight:bold;'>{ref_oculta}</span></div>", unsafe_allow_html=True)
@@ -317,9 +319,9 @@ if file and not df_filtered.empty:
             </div>
         </div>"""
 
-        # Reparto de anchos (15% para el boton, 85% para la tarjeta) para evitar deformaciones
+        # Seccion de botones con un tamano minimo para que la tarjeta respire bien
         if side == "left":
-            c_btn, c_card = st.columns([0.15, 0.85], vertical_alignment="center")
+            c_btn, c_card = st.columns([0.1, 0.9], vertical_alignment="center")
             with c_btn:
                 st.markdown("<div class='btn-micro'>", unsafe_allow_html=True)
                 if st.button("✕", key=f"hide_{ref_str}"):
@@ -329,7 +331,7 @@ if file and not df_filtered.empty:
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
         else:
-            c_card, c_btn = st.columns([0.85, 0.15], vertical_alignment="center")
+            c_card, c_btn = st.columns([0.9, 0.1], vertical_alignment="center")
             with c_card:
                 st.markdown(card_html, unsafe_allow_html=True)
             with c_btn:
@@ -358,25 +360,18 @@ if file and not df_filtered.empty:
             for _, row in right_df.iterrows():
                 render_promo_card(row, "right")
 
-    # MAPA CON CARTODB y ESRI (Optimizados)
+    # MAPA NATIVO Y LIMPIO (SIN FILTROS CSS NI HACKS DE COLOR)
     with col_mapa:
         m = folium.Map(tiles=None, control_scale=False, zoom_control=True)
         
-        # EL TRUCO PARA ELIMINAR EL PARPADEO GRIS:
-        # Inyectamos CSS al contenedor del mapa para que el color de fondo mientras carga sea oscuro (#121212)
-        m.get_root().html.add_child(folium.Element("<style>.leaflet-container { background: #121212 !important; }</style>"))
-
         if tipo_vista == "Callejero":
-            if estilo_mapa == "Estandar":
-                tiles_url = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-            elif estilo_mapa == "Escala de Grises":
-                tiles_url = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-            else: 
-                tiles_url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            
-            folium.TileLayer(tiles=tiles_url, attr='CartoDB', name='Callejero', overlay=False).add_to(m)
-            
-        else: # Satelite
+            # Usamos el mapa limpio de CartoDB original que querias
+            folium.TileLayer(
+                tiles='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                attr='CartoDB', name='Callejero', overlay=False
+            ).add_to(m)
+        else:
+            # Satelite Esri con etiquetas municipales superpuestas
             folium.TileLayer(
                 tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                 attr='Esri', name='Satelite Base', overlay=False
@@ -426,8 +421,6 @@ if file and not df_filtered.empty:
                     icon=folium.DivIcon(html=marker_html, icon_anchor=(14, 10))
                 ).add_to(m)
 
-        # returned_objects=["bounds"] evita que el mapa mande datos a Streamlit cada milimetro que mueves el raton.
-        # Esto reduce dramaticamente los parpadeos y recargas innecesarias.
         st_folium(m, width="100%", height=ALTURA_CONTENEDOR, key="main_map", returned_objects=["bounds"])
 
 else:
